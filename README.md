@@ -44,8 +44,8 @@ For linux users, do not use the provided desktop file, because that is for my us
 
 # #] Formats
 PRIZ PLAYER uses VLC as it's backend, so it supports most all file formats. Here is a list 
-of files you can view within the viewer. If you know of the extensions to other formats that VLC
-supports, feel free to let me know under the issues tab.
+of files you can view within the file chooser and album viewer. If you know of the extensions 
+to other formats that VLC supports, feel free to let me know under the issues tab.
 
 `.3gp`, `.asf`, `.avi`, `.dvr-ms`, `.flv`,
 `.mkv`, `.midi`, `.mid`, `.qtff`, `.mp4`,
