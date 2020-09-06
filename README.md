@@ -3,7 +3,7 @@ A music player with a terminal aesthetic
 
 # #] REASON
 As a Kubuntu user, I've been using KDE's Elisa for quite a while. Elisa is a slow music player that 
-for some reaon plays the same track several times in a row in shuffle mode and cannot enter single track
+for some reason plays the same track several times in a row in shuffle mode and cannot enter single track
 mode. I decided to make my own music player with a terminal aesthetic because that looks neat.
 
 # #] NOTICE
