@@ -9,6 +9,8 @@ mode. I decided to make my own music player with a terminal aesthetic because th
 # #] NOTICE
 This is still in the alpha phase, so you're going to have to install VLC and Python 3.7+ yourself.
 
+For linux users, do not use the provided desktop file, because that is for my use only for now. 
+
 ### #] Current missing features:
 - Repeat
 - Shuffle
