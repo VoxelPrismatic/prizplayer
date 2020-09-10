@@ -7,7 +7,7 @@
 
 def file_chooser():
     global hold_display, term_y, term_x
-    if sys.executable.startswith("/usr/bin/"):
+    if sys.executable.startswith("/"):
         folder = "/"
         directory = "/home/" + os.getlogin() + "/Music/"
     else:
@@ -131,7 +131,7 @@ def file_chooser():
                 else:
                     prefs["search_dirs"].append(directory + ls[cursor] + "/")
                 open("conf.json", "w").write(json.dumps(prefs, indent = "    "))
-        elif event.type in EVT["INPUT"]:
+        elif event.type in EVT["INPUT"] and event.text:
             if alt:
                 if evt.text in __available_keys:
                     return evt.text
@@ -148,9 +148,10 @@ def file_chooser():
             elif finding:
                 search += event.text
             else:
+                og_cur = (cursor, offset)
                 cursor = 0
                 offset = 0
-                for f in ls:
+                for f in added:
                     if f.lower().startswith(event.text.lower()):
                         break
                     if cursor + 1 < len(ls):
@@ -158,8 +159,7 @@ def file_chooser():
                     if offset + 25 < cursor and offset + 1 < len(ls):
                         offset += 1
                 else:
-                    cursor = 0
-                    offset = 0
+                    cursor, offset = og_cur
             alt = False
         elif event.type in EVT["WHEEL"]:
             if event.y == 1:

@@ -42,7 +42,7 @@ def show_prefs():
         evt = pygame.event.wait()
         if evt.type in EVT["QUIT"]:
             kill()
-        elif evt.type in [*EVT["INPUT"], *EVT["KEY"], *EVT["KEYDOWN"]]:
+        elif evt.type in [*EVT["INPUT"], *EVT["KEY"], *EVT["KEYDOWN"], *EVT["WHEEL"], *EVT["CLICK"]]:
             event = evt
             rep = False
         elif evt.type in EVT["WINDOW"]:
@@ -74,7 +74,7 @@ def show_prefs():
                 search = search[:-1]
             elif evt.scancode == KEY["INS"]:
                 return "o"
-        elif event.type in EVT["INPUT"]:
+        elif event.type in EVT["INPUT"] and event.text:
             if alt:
                 if evt.text in __available_keys:
                     return evt.text
@@ -83,6 +83,7 @@ def show_prefs():
             elif finding:
                 search += event.text
             else:
+                og_cur = (cursor, offset)
                 cursor = 0
                 offset = 0
                 for f in prefs["search_dirs"]:
@@ -92,4 +93,22 @@ def show_prefs():
                         cursor += 1
                     if offset + 25 < cursor and offset + 1 < len(prefs["search_dirs"]):
                         offset += 1
+                else:
+                    cursor, offset = og_cur
             alt = False
+        elif event.type in EVT["WHEEL"]:
+            if event.y == 1:
+                if cursor - 1 >= 0:
+                    cursor -= 1
+                if offset > cursor and offset - 1 >= 0:
+                    offset -= 1
+                alt = False
+            elif event.y == -1:
+                if cursor + 1 < len(prefs["search_dirs"]):
+                    cursor += 1
+                if offset + 25 < cursor and offset + 1 < len(prefs["search_dirs"]):
+                    offset += 1
+                alt = False
+        elif event.type in EVT["CLICK"]:
+            if event.button == 3:
+                alt = not alt

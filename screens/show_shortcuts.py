@@ -24,8 +24,24 @@ def show_shortcuts():
         for key in keys:
             echo_n(f'{" " * 15 + key + " ":-<40}', color = 0xeeeeee if term_y % 2 else 0xaaaaaa)
             echo(f'{" " + keys[key] + " " * 15:->40}')
-        while term_y < 28:
-            echo()
+        echo()
+        echo(f"{'PLAYER ONLY':-^80}")
+        echo()
+        keys = {
+            "r": "Repeat all/one/none",
+            "s": "Shuffle on/off",
+            "ALT + ->": "Next track",
+            "SHIFT + .": "Next track",
+            "ALT + <-": "Prev track",
+            "SHIFT + ,": "Prev track",
+            "->": "Fast forward",
+            "<-": "Rewind",
+            "SPACE": "Pause",
+        }
+        for key in keys:
+            echo_n(f'{" " * 15 + key + " ":-<40}', color = 0xeeeeee if term_y % 2 else 0xaaaaaa)
+            echo(f'{" " + keys[key] + " " * 15:->40}')
+        term_y = 28
         echo("--------------------------------------------------------------------------------", color = 0x008844, font = font_b)
         echo("Be sure to press alt                                                          ;]")
         redraw()
@@ -42,6 +58,6 @@ def show_shortcuts():
         print(f"\x1b[94;1m{evt.type}\x1b[0m:", evt)
         if event is None:
             continue
-        elif event.type in EVT["INPUT"]:
+        elif event.type in EVT["INPUT"] and event.text:
             if evt.text in __available_keys:
                 return evt.text

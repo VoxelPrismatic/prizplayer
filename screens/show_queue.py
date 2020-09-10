@@ -12,18 +12,16 @@ def show_queue():
     alt = False
     search = ""
     finding = False
+    refresh_tag = True
     queue_tag = []
-    for track in queue:
-        tags = id3.tag.Tag()
-        tags.parse(open(track, "rb"))
-        queue_tag.append([tags.title or "<NULL>", tags.artist or "<Unknown>", tags.album or "<None>", track])
     while True:
-        if len(queue_tag) != len(queue):
+        if len(queue_tag) != len(queue) or refresh_tag:
             queue_tag = []
             for track in queue:
                 tags = id3.tag.Tag()
                 tags.parse(open(track, "rb"))
                 queue_tag.append([tags.title or "<NULL>", tags.artist or "<Unknown>", tags.album or "<None>"])
+            refresh_tag = False
         hold_display = True
         clear(0x112211)
         echo("         -------==================[ IN QUEUE ]==================-------         ", color = 0x00ff00, font = font_b)
@@ -62,14 +60,14 @@ def show_queue():
         term_y = 28
         echo(f"{'[' + str(cursor + 1) + '/' + str(len(queue)) + ']':->80}", font = font_b, color = 0x008800)
         if alt:
-            echo("p - Player  /  s - Save queue  /  f - Toggle search  /  F1 - More screens     ;]")
+            echo("l - Load queue / s - Save queue / f - Toggle search / F1 - More screens       ;]")
         else:
             echo("ALT - Use shortcut / DEL - Remove from queue / , - Move up / . - Move down    ;]")
         redraw()
         evt = pygame.event.wait()
         if evt.type in EVT["QUIT"]:
             kill()
-        elif evt.type in [*EVT["INPUT"], *EVT["KEY"], *EVT["KEYDOWN"]]:
+        elif evt.type in [*EVT["INPUT"], *EVT["KEY"], *EVT["KEYDOWN"], *EVT["WHEEL"], *EVT["CLICK"]]:
             event = evt
             rep = False
         elif evt.type in EVT["WINDOW"]:
@@ -79,7 +77,7 @@ def show_queue():
         print(f"\x1b[94;1m{evt.type}\x1b[0m:", evt)
         if event is None:
             continue
-        if event.type in EVT["KEYDOWN"]:
+        if event.type in EVT["KEYDOWN"] and event:
             if event.scancode == KEY["UP"]:
                 if cursor - 1 >= 0:
                     cursor -= 1
@@ -101,15 +99,32 @@ def show_queue():
                 search = search[:-1]
             elif evt.scancode == KEY["F1"] and alt:
                 return "f1"
-        elif event.type in EVT["INPUT"]:
+        elif event.type in EVT["INPUT"] and event.text:
             if alt:
-                if evt.text in __available_keys:
-                    return evt.text
-                elif evt.text == "f":
+                if event.text in __available_keys:
+                    return event.text
+                elif event.text == "f":
                     finding = not finding
             elif finding:
                 search += event.text
+            elif event.text == ",":
+                if cursor - 1 >= 0:
+                    queue[cursor], queue[cursor - 1] = queue[cursor - 1], queue[cursor]
+                    cursor -= 1
+                    if offset > cursor and offset - 1 >= 0:
+                        offset -= 1
+                    alt = False
+                    refresh_tag = True
+            elif event.text == ".":
+                if cursor + 1 < len(queue):
+                    queue[cursor], queue[cursor + 1] = queue[cursor + 1], queue[cursor]
+                    cursor += 1
+                    if offset + 25 < cursor and offset + 1 < len(queue):
+                        offset += 1
+                    alt = False
+                    refresh_tag = True
             else:
+                og_cur = (cursor, offset)
                 cursor = 0
                 offset = 0
                 for f in queue:
@@ -119,4 +134,22 @@ def show_queue():
                         cursor += 1
                     if offset + 25 < cursor and offset + 1 < len(queue):
                         offset += 1
+                else:
+                    cursor, offset = og_cur
             alt = False
+        elif event.type in EVT["WHEEL"]:
+            if event.y == 1:
+                if cursor - 1 >= 0:
+                    cursor -= 1
+                if offset > cursor and offset - 1 >= 0:
+                    offset -= 1
+                alt = False
+            elif event.y == -1:
+                if cursor + 1 < len(queue):
+                    cursor += 1
+                if offset + 25 < cursor and offset + 1 < len(queue):
+                    offset += 1
+                alt = False
+        elif event.type in EVT["CLICK"]:
+            if event.button == 3:
+                alt = not alt

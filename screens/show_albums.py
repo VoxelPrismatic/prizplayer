@@ -55,6 +55,8 @@ def show_albums():
         tags.parse(open(track, "rb"))
         if tags is None:
             continue
+        print(dir(tags))
+#        print(tags.file_info.)
         try:
             albums[tags.album]["Tracks"][tags.track_num[0]] = {"file": track, "name": tags.title, "cover": None}
             try:
@@ -120,7 +122,7 @@ def show_albums():
             }
         if not finding:
             echo_n(f"{' ' + album_info['Album'] + ' ':-^80}", font = font_r)
-        echo(color = 0xaaaaaa)
+        echo(color = 0xffffff)
         event = None
         echo(album_info["Album"], font = font_b)
         echo(album_info["Artist"], font = font_ri)
@@ -133,9 +135,9 @@ def show_albums():
             echo("s")
         echo("Released in " + str(album_info["Year"]))
         if offset == 0:
-            echo()
+            echo(color = 0xaaaaaa)
         else:
-            echo("  ...", font = font_b)
+            echo("  ...", font = font_b, color = 0xaaaaaa)
         term.fill(rgb(0x333744), rect = (0, (tracker - offset + 8) * 16 + 12, term_w, 16))
 
 
@@ -178,10 +180,10 @@ def show_albums():
                 except KeyError:
                     echo("<NULL>", font = font_b)
             if term_y == 27 and track != t_nums[-1]:
-                echo("  ...")
+                echo("  ...", color = 0xaaaaaa)
                 break
         term_y = 27
-        echo("<" + " " * 78 + ">", font = font_b)
+        echo("<" + " " * 78 + ">", font = font_b, color = 0xffffff)
         echo(f"{'[' + str(cursor + 1) + '/' + str(len(albums)) + ']':->80}", color = 0x004488)
         if alt:
             echo("a - Toggle all tracks in queue  /  f - Toggle search  /  F1 - More screens    ;]")
@@ -245,7 +247,7 @@ def show_albums():
                 search = search[:-1]
             elif evt.scancode == KEY["F1"]:
                 return "f1"
-        elif event.type in EVT["INPUT"]:
+        elif event.type in EVT["INPUT"] and event.text:
             if alt:
                 if evt.text in __available_keys:
                     return evt.text
@@ -264,13 +266,15 @@ def show_albums():
             elif finding:
                 search += event.text
             else:
-                cursor += 1
-                if cursor == len(albums):
-                    cursor = 0
-                while not str(cursor_album[cursor]).lower().startswith(event.text.lower()):
+                txt = event.text.lower()
+                if any(str(cursor_album[c]).lower().startswith(txt) for c in cursor_album):
                     cursor += 1
                     if cursor == len(albums):
                         cursor = 0
+                    while not str(cursor_album[cursor]).lower().startswith(txt):
+                        cursor += 1
+                        if cursor == len(albums):
+                            cursor = 0
             alt = False
         elif event.type in EVT["WHEEL"]:
             if event.y == 1:
