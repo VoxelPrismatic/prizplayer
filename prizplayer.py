@@ -220,7 +220,7 @@ try:
         try_print(dir(evt))
 except Exception as ex:
     try:
-        open("/home/priz/TRANSFER/prizplayer/tb.txt", "w+").write(
+        open(f"/home/{os.getlogin()}/.config/prizplayer/tb.txt", "w+").write(
             f"\n{str(type(ex))[8:-2]}: {ex}"
             "\n".join(traceback.format_tb(ex.__traceback__))
         )
