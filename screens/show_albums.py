@@ -5,39 +5,20 @@
 # please, but no warranty is provided. More info is in the LICENSE file
 # located in the root of the repository.
 
-file_formats = [
-    ".3gp", ".asf", ".avi", ".dvr-ms", ".flv",
-    ".mkv", ".midi", ".mid", ".qtff", ".mp4",
-    ".mp3", ".mp2", ".mpeg", ".m4a", ".ogg",
-    ".ogm", ".wav", ".aiff", ".mxf", ".vob",
-    ".rm", ".aac", ".ac3", ".alac", ".amr",
-    ".dts", ".xm", ".flac", ".mace", ".mod",
-    ".opus", ".pls", ".qcp", ".qdm2", ".qdmc",
-    ".wma", ".wmv", ".webm", ".ogv"
-]
-
-def grab_files(root):
-    ls = []
-    for f in os.listdir(root):
-        try:
-            ls.extend(grab_files(root + f + "/"))
-        except:
-            if any(f.lower().endswith(x) for x in file_formats):
-                ls.append(root + f)
-    return ls
-
 def show_albums():
-    global hold_display, term_y, term_x
+    global TERM, folder_slash
     cursor = 0
     offset = 0
     tracker = 0
+    TERM.hold = True
     clear(0x111522)
-    echo("         -------===============[ FINDING ALBUMS ]===============-------         ", color = 0x0088ff, font = font_b)
-    echo("-" * 80, font = font_r)
-    echo("Give me just a moment, I'm searching for your music")
-    term_y = 28
-    echo("--------------------------------------------------------------------------------", color = 0x004488, font = font_b)
-    echo("                                                                              ;]")
+    echo("-------===============[ FINDING ALBUMS ]===============-------", center = TERM.w, color = 0x0088ff, font = FONT.b)
+    echo("-" * TERM.w, font = FONT.r)
+    echo("Just a sec, I'm searching for your music")
+    TERM.foot()
+    echo("-" * TERM.w, color = 0x004488, font = FONT.b)
+    echo(";]", right = TERM.w)
+    redraw()
     prefs = json.loads(open("conf.json").read())
     albums = {}
     music = []
@@ -45,165 +26,218 @@ def show_albums():
     finding = False
     search = ""
     alt = False
-    term_y = 3
+    TERM.y = 3
     echo("Locating...")
     for directory in prefs["search_dirs"]:
         music.extend(grab_files(directory))
+    blank_cover = open(s(f"./assets/icon.png"), "rb").read()
     echo("Parsing...")
+    t_n = 0
     for track in music:
-        tags = id3.tag.Tag()
-        tags.parse(open(track, "rb"))
-        if tags is None:
-            continue
-        print(dir(tags))
-#        print(tags.file_info.)
+        try_print(f"\x1b[93;1m{track}\x1b[0m")
+        t_n += 1
         try:
-            albums[tags.album]["Tracks"][tags.track_num[0]] = {"file": track, "name": tags.title, "cover": None}
-            try:
-                albums[tags.album]["Tracks"][tags.track_num[0]]["cover"] = \
-                    tags.frame_set[b'APIC'][0].image_data
-            except:
-                pass
+            tags = tinytag.TinyTag.get(track, image = True)
+            cover = tags.get_image() or blank_cover
+        except Exception as ex:
+            tags = tinytag.TinyTag.get(track)
+            cover = blank_cover
+        cover = fix_image(cover)
+        try_print(tags)
+        title = tags.title or track.split(folder_slash)[-1]
+        album = tags.album or track.split(folder_slash)[-2]
+        track_num = int(tags.track or t_n)
+        try:
+            #input(tags)
+            albums[album]["Tracks"][track_num] = {
+                "file": track,
+                "name": title,
+                "cover": cover,
+                "tags": tags
+            }
         except:
+            t_n = 1
+            track_num = int(tags.track or t_n)
             dic = {}
-            try:
-                dic["Year"] = tags.recording_date.year
-            except:
-                dic["Year"] = "<Unknown>"
-            dic["Album"] = tags.album or track.split("/")[-2]
-            print(dic["Album"])
-            dic["Artist"] = tags.artist or "<Unknown>"
+            dic["Year"] = tags.year or "<Unknown>"
+            dic["Album"] = album
+            try_print(dic["Album"])
+            artist = tags.artist or "<Unknown>"
+            dic["Artist"] = artist
             dic["Tracks"] = {}
-            albums[tags.album] = dic
-            albums[tags.album]["Tracks"][tags.track_num[0]] = {"file": track, "name": tags.title, "cover": None}
-            try:
-                img = tags.frame_set[b'APIC'][0].image_data
-                albums[tags.album]["Tracks"][tags.track_num[0]]["cover"] = img
-                albums[tags.album]["Cover"] = img
-            except:
-                pass
+            albums[album] = dic
+            albums[album]["Tracks"][track_num] = {
+                "file": track,
+                "name": title,
+                "cover": cover,
+                "tags": tags
+            }
+
     for album in albums:
         cursor_album[len(cursor_album)] = album
+    skip_draw = False
+    pygame.event.clear()
     while True:
-        hold_display = True
-        none_found = False
-        clear(0x111522)
-        echo("         -------================[ YOUR  ALBUMS ]================-------         ", color = 0x0088ff, font = font_b)
-        if finding:
-            search = ' "' + search + '" '
-            echo_n(f"{search:-^80}", font = font_r)
-            search = search[2:-2]
-            cursor = max(0, cursor)
-            og_cur = cursor - 1
-            if og_cur == -1:
-                og_cur = len(albums) - 1
-            while search.lower() not in \
-                    str(cursor_album[cursor]).lower() and \
-                    search.lower() not in albums[cursor_album[cursor]]["Artist"].lower() and \
-                    cursor != og_cur:
-                cursor += 1
-                if cursor == len(albums):
-                    cursor = 0
-                if cursor == og_cur:
-                    none_found = True
-                print(cursor, og_cur)
-            print(",")
-        try:
-            if none_found:
-                raise KeyError("No album found")
-            album_info = albums[cursor_album[cursor]]
-        except KeyError:
-            album_info = {
-                "Year": "0000",
-                "Album": "<NULL>",
-                "Artist": "Try adding a folder to search in",
-                "Cover": None,
-                "Tracks": []
-            }
-        if not finding:
-            echo_n(f"{' ' + album_info['Album'] + ' ':-^80}", font = font_r)
-        echo(color = 0xffffff)
-        event = None
-        echo(album_info["Album"], font = font_b)
-        echo(album_info["Artist"], font = font_ri)
-        echo()
-        num_tracks = str(len(album_info["Tracks"]))
-        echo_n(num_tracks + " track", font = font_r)
-        if num_tracks == "1":
-            echo()
-        else:
-            echo("s")
-        echo("Released in " + str(album_info["Year"]))
-        if offset == 0:
-            echo(color = 0xaaaaaa)
-        else:
-            echo("  ...", font = font_b, color = 0xaaaaaa)
-        term.fill(rgb(0x333744), rect = (0, (tracker - offset + 8) * 16 + 12, term_w, 16))
-
-
-        t_nums = list(album_info["Tracks"])
-        t_og = {}
-        t_bk = t_nums
-        count = -1
-        for i in range(len(t_nums)):
-            count += 1
-            if type(t_nums[i]) != int:
-                t_nums[i] = count
-                t_og[count] = i
-        t_nums.sort()
-
-
-        try:
-            album_info["Cover"]
-        except:
-            album_info["Cover"] = open("./assets/icon.png", "rb").read()
-        img = pygame.Surface.convert(
-            pygame.image.load(
-                io.BytesIO(album_info["Cover"] or open("./assets/icon.png", "rb").read())
-            ).convert_alpha()
-        )
-        img = pygame.transform.smoothscale(img, (156, 156))
-        term.blit(img, (term_w - 166, 48, 156, 156))
-
-        for track in t_nums[offset:]:
+        if not skip_draw:
+            TERM.hold = True
+            none_found = False
+            clear(0x111522)
+            echo("-------===============[ YOUR ALBUMS ;] ]===============-------", center = TERM.w, color = 0x0088ff, font = FONT.b)
+            if finding:
+                search = ' "' + search + '" '
+                echo_n(search, center = TERM.w, char = "-", font = FONT.r)
+                search = search[2:-2]
+                cursor = max(0, cursor)
+                og_cur = cursor - 1
+                if og_cur == -1:
+                    og_cur = len(albums) - 1
+                while search.lower() not in \
+                        str(cursor_album[cursor]).lower() and \
+                        search.lower() not in albums[cursor_album[cursor]]["Artist"].lower() and \
+                        cursor != og_cur:
+                    cursor += 1
+                    if cursor == len(albums):
+                        cursor = 0
+                    if cursor == og_cur:
+                        none_found = True
+                    try_print(cursor, og_cur)
+                try_print(",")
             try:
-                if album_info['Tracks'][track]['file'] in queue:
-                    echo_n(color = 0xffffff)
-                else:
-                    echo_n(color = 0xaaaaaa)
-                echo_n(f"{track:0>2}] ", font = font_r)
-                echo(album_info['Tracks'][track]['name'] or "<NULL>", font = font_b)
+                if none_found:
+                    raise KeyError("No album found")
+                album_info = albums[cursor_album[cursor]]
             except KeyError:
-                echo_n(f"{track:0>2}] ", font = font_r)
+                album_info = {
+                    "Year": "0000",
+                    "Album": "<NULL>",
+                    "Artist": "Try adding a folder to search in",
+                    "Cover": None,
+                    "Tracks": []
+                }
+            while offset + TERM.h - 12 < tracker and offset + 1 < len(album_info["Tracks"]):
+                offset += 1
+            while offset > tracker and offset - 1 >= 0:
+                offset -= 1
+            if not finding:
+                echo_n(f" {album_info['Album']} ", center = TERM.w, char = "-", font = FONT.r)
+            echo(color = 0xffffff)
+            event = None
+            echo(album_info["Album"], font = FONT.r)
+            echo(album_info["Artist"], font = FONT.i)
+            echo()
+            num_tracks = str(len(album_info["Tracks"]))
+            echo_n(num_tracks + " track", font = FONT.r)
+            if num_tracks == "1":
+                echo()
+            else:
+                echo("s")
+            echo("Released in " + str(album_info["Year"]))
+            if offset == 0:
+                echo(color = 0xaaaaaa)
+            else:
+                echo("  ...", font = FONT.b, color = 0xaaaaaa)
+            term.fill(rgb(0x333744), rect = (0, (tracker - offset + 8) * 16 + 12 + TERM.off.y, TERM.px.w, 16))
+
+            t_nums = list(album_info["Tracks"])
+            t_og = {}
+            t_bk = t_nums
+            count = -1
+            track = 0
+            for i in range(len(t_nums)):
+                count += 1
+                if count == tracker:
+                    track = t_nums[i]
+                if type(t_nums[i]) != int:
+                    t_nums[i] = count
+                    t_og[count] = i
+            t_nums.sort()
+            try:
+                img = pygame.Surface.convert(
+                    pygame.image.load(
+                        io.BytesIO(album_info["Tracks"][track]["cover"])
+                    ).convert_alpha()
+                )
+            except:
+                img = pygame.Surface.convert(
+                    pygame.image.load(
+                        io.BytesIO(blank_cover)
+                    ).convert_alpha()
+                )
+
+            img = pygame.transform.smoothscale(img, (156, 156))
+            term.blit(img, (TERM.px.w - 166 - TERM.off.x, 48, 156, 156))
+            c = -1
+            for track in t_nums[offset:]:
+                c += 1
                 try:
-                    echo(str(album_info["Tracks"][t_bk[t_og[track]]]['name']), font = font_b)
+                    if album_info['Tracks'][track]['file'] in queue:
+                        echo_n(color = 0xffffff)
+                    else:
+                        echo_n(color = 0xaaaaaa)
+                    TERM.x = 1
+                    seconds = int(album_info['Tracks'][track]['tags'].duration or 0)
+                    minutes = int(seconds / 60)
+                    seconds %= 60
+                    echo_n(f"{track:0>2}] ", font = FONT.r)
+                    n = album_info['Tracks'][track]['name'] or album_info['Tracks'][track]['file'].split(s("/"))[-1]
+                    if len(n) > TERM.w - 38 and tracker - offset == c:
+                        term.fill(rgb(0x333744), rect = (0, (tracker - offset + 8) * 16 + 12 + TERM.off.y, TERM.px.w, 16))
+                        TERM.x = 1
+                        echo_n(f"{track:0>2}] ", font = FONT.r)
+                        if len(n) > TERM.w - 13:
+                            echo_n(f"{n[:TERM.w - 16]}... ", font = FONT.b)
+                        else:
+                            echo_n(n, font = FONT.b)
+                        echo(f" {minutes:02}:{seconds:02}", font = FONT.i)
+                    elif len(n) > TERM.w - 25:
+                        echo(n[:TERM.w - 28] + "...", font = FONT.b)
+                    else:
+                        echo_n(n, font = FONT.b)
+                        if tracker - offset == c:
+                            echo(f" {minutes:02}:{seconds:02}", font = FONT.i)
+                        else:
+                            echo()
                 except KeyError:
-                    echo("<NULL>", font = font_b)
-            if term_y == 27 and track != t_nums[-1]:
-                echo("  ...", color = 0xaaaaaa)
-                break
-        term_y = 27
-        echo("<" + " " * 78 + ">", font = font_b, color = 0xffffff)
-        echo(f"{'[' + str(cursor + 1) + '/' + str(len(albums)) + ']':->80}", color = 0x004488)
-        if alt:
-            echo("a - Toggle all tracks in queue  /  f - Toggle search  /  F1 - More screens    ;]")
-        elif tracker + 1 in list(album_info['Tracks']) and album_info['Tracks'][tracker + 1]['file'] in queue:
-            echo("ALT - Use shortcut  /  ENTER - Remove from queue                              ;]")
-        else:
-            echo("ALT - Use shortcut  /  ENTER - Add to queue                                   ;]")
-        redraw()
-        evt = pygame.event.wait()
-        if evt.type in EVT["QUIT"]:
-            kill()
-        elif evt.type in [*EVT["INPUT"], *EVT["KEY"], *EVT["KEYDOWN"], *EVT["WHEEL"], *EVT["CLICK"]]:
-            event = evt
-            rep = False
-        elif evt.type in EVT["WINDOW"]:
-            pygame.display.update()
-        else:
-            continue
-        print(f"\x1b[94;1m{evt.type}\x1b[0m:", evt)
+                    echo_n(f" {track:0>2}] ", font = FONT.r)
+                    try:
+                        echo(str(album_info["Tracks"][t_bk[t_og[track]]]['name']), font = FONT.b)
+                    except KeyError:
+                        echo(album_info['Tracks'][list(album_info['Tracks'])[c]]['file'].split(s("/"))[-1], font = FONT.b)
+                if TERM.y == TERM.h - 3 and track != t_nums[-1]:
+                    echo("  ...", color = 0xaaaaaa, font = FONT.b)
+                    break
+            TERM.y = TERM.h - 3
+            echo("<" + ">".rjust(TERM.w - 1), font = FONT.b, color = 0xffffff)
+            echo(f"[{cursor + 1}/{len(albums)}]".rjust(TERM.w, "-"), color = 0x004488)
+            if alt:
+                echo_n("a - Toggle all tracks in queue  /  f - Toggle search  /  F1 - More screens")
+            elif tracker + 1 in list(album_info['Tracks']) and album_info['Tracks'][tracker + 1]['file'] in queue:
+                echo_n("ALT - Use shortcut  /  ENTER - Remove from queue")
+            else:
+                echo_n("ALT - Use shortcut  /  ENTER - Add to queue")
+            echo(";]", right = TERM.rem)
+            redraw()
+
+        evt = None
+        event = None
+        skip_draw = False
+        while evt is None:
+            evt = pygame.event.wait()
+            try_print(f"\x1b[94;1m{evt.type}\x1b[0m:", evt)
+            if evt.type in EVT["QUIT"]:
+                kill()
+            elif evt.type in [*EVT["INPUT"], *EVT["KEYDOWN"], *EVT["WHEEL"], *EVT["CLICK"], *EVT["MOUSEMOVE"]]:
+                event = evt
+                rep = False
+            elif evt.type in EVT["WINDOW"]:
+                event = evt
+            else:
+                continue
+
+        print(list(album_info["Tracks"]))
+
         if event is None:
+            skip_draw = True
             continue
         if event.type in EVT["KEYDOWN"]:
             if event.scancode == KEY["LEFT"]:
@@ -211,6 +245,20 @@ def show_albums():
                     cursor -= 1
                 else:
                     cursor = len(albums) - 1
+                if finding:
+                    og_cur = cursor + 1
+                    if og_cur == len(albums):
+                        og_cur = 0
+                    while search.lower() not in \
+                            str(cursor_album[cursor]).lower() and \
+                            search.lower() not in albums[cursor_album[cursor]]["Artist"].lower() and \
+                            cursor != og_cur:
+                        cursor -= 1
+                        if cursor == -1:
+                            cursor = len(albums) - 1
+                        if cursor == og_cur:
+                            none_found = True
+                        try_print(cursor, og_cur)
                 offset = 0
                 tracker = 0
                 alt = False
@@ -225,17 +273,16 @@ def show_albums():
             elif event.scancode == KEY["UP"]:
                 if tracker - 1 >= 0:
                     tracker -= 1
-                if offset > tracker and offset - 1 >= 0:
-                    offset -= 1
                 alt = False
             elif event.scancode == KEY["DOWN"]:
                 if tracker + 1 < len(album_info["Tracks"]):
                     tracker += 1
-                if offset + 18 < tracker and offset + 1 < len(album_info["Tracks"]):
-                    offset += 1
                 alt = False
             elif evt.scancode == KEY["ENTER"]:
-                f = album_info['Tracks'][tracker + 1]['file']
+                try:
+                    f = album_info['Tracks'][tracker + 1]['file']
+                except KeyError:
+                    f = album_info["Tracks"][list(album_info["Tracks"])[tracker]]['file']
                 if f in queue:
                     queue.remove(f)
                 else:
@@ -245,7 +292,7 @@ def show_albums():
                 alt = not alt
             elif evt.scancode == KEY["BKSP"] and finding:
                 search = search[:-1]
-            elif evt.scancode == KEY["F1"]:
+            elif evt.scancode == KEY["F1"] and alt:
                 return "f1"
         elif event.type in EVT["INPUT"] and event.text:
             if alt:
@@ -280,38 +327,26 @@ def show_albums():
             if event.y == 1:
                 if tracker - 1 >= 0:
                     tracker -= 1
-                if offset > tracker and offset - 1 >= 0:
-                    offset -= 1
-                alt = False
             elif event.y == -1:
                 if tracker + 1 < len(album_info["Tracks"]):
                     tracker += 1
-                if offset + 18 < tracker and offset + 1 < len(album_info["Tracks"]):
-                    offset += 1
-                alt = False
             elif event.x == 1:
-                if cursor - 1 >= 0:
-                    cursor -= 1
-                else:
-                    cursor = len(albums) - 1
-                offset = 0
-                tracker = 0
-                alt = False
+                kb_press(Key.left)
             elif event.x == -1:
-                if cursor + 1 < len(albums):
-                    cursor += 1
-                else:
-                    cursor = 0
-                offset = 0
-                tracker = 0
-                alt = False
+                kb_press(Key.right)
         elif event.type in EVT["CLICK"]:
             if event.button == 1:
-                f = album_info['Tracks'][tracker + 1]['file']
-                if f in queue:
-                    queue.remove(f)
+                if event.pos[1] >= (TERM.h - 3) * 16 + TERM.off.y and event.pos[0] <= 8 * 2 + TERM.off.x:
+                    kb_press(Key.left)
+                elif event.pos[1] >= (TERM.h - 3) * 16 + TERM.off.y and event.pos[0] >= (TERM.w - 2) * 8 - TERM.off.x:
+                    kb_press(Key.right)
                 else:
-                    queue.append(f)
+                    kb_press(Key.enter)
                 alt = False
             elif event.button == 3:
                 alt = not alt
+        elif event.type in EVT["MOUSEMOVE"]:
+            t1 = tracker
+            tracker = offset + min(max(int((event.pos[1] - 16 * 9) / 16), 0), min(TERM.h - 12, len(album_info["Tracks"]) - 1))
+            if t1 == tracker:
+                skip_draw = True

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mime-type xmlns="http://www.freedesktop.org/standards/shared-mime-info" type="audio/prizplaylist">
+  <!--Created automatically by update-mime-database. DO NOT EDIT!-->
+  <comment>PRIZ PLAYLIST ;]</comment>
+  <icon name="/home/priz/.config/prizplayer/assets/icon.png"/>
+  <glob-deleteall/>
+  <glob pattern="*.PRZ"/>
+  <glob pattern="*.PRz"/>
+  <glob pattern="*.PrZ"/>
+  <glob pattern="*.Prz"/>
+  <glob pattern="*.pRZ"/>
+  <glob pattern="*.pRz"/>
+  <glob pattern="*.prZ"/>
+  <glob pattern="*.prz"/>
+</mime-type>

@@ -6,12 +6,10 @@
 # located in the root of the repository.
 
 def file_chooser():
-    global hold_display, term_y, term_x
-    if sys.executable.startswith("/"):
-        folder = "/"
+    global TERM, queue, folder_slash
+    if folder_slash == "/":
         directory = "/home/" + os.getlogin() + "/Music/"
     else:
-        folder = "\\"
         directory = "C:\\Users\\" + os.getlogin() + "\\Music\\"
     ls = [".."] + os.listdir(directory)
     cursor = 0
@@ -20,95 +18,104 @@ def file_chooser():
     ls.sort()
     finding = False
     alt = False
+    added = []
     prefs = json.loads(open("conf.json").read())
+    skip_draw = False
     while True:
-        hold_display = True
-        clear(0x221115)
-        echo("         -------================[ CHOOSE FILES ]================-------         ", color = 0xff0088, font = font_b)
-        term.fill(rgb(0x443337), rect = (0, (cursor - offset + 2) * 16 + 12, term_w, 16))
-        if finding:
-            search = ' "' + search + '" '
-            echo_n(f"{search:-^80}", font = font_r)
-            search = search[2:-2]
-        else:
-            echo_n(f"{' ' + directory[-60:] + ' ':-^80}", font = font_r)
-        echo(color = 0xaaaaaa)
-        event = None
-        for thing in ls[:]:
-            if os.path.isdir(directory + thing):
-                continue
-            elif not any(thing.lower().endswith(x) for x in file_formats):
-                ls.remove(thing)
-        added = []
-        tls = ls[offset:]
-        for file_or_dir in ls:
+        if not skip_draw:
+            while offset + TERM.h - 5 < cursor and offset + 1 < len(added):
+                offset += 1
+            while offset > cursor and offset - 1 >= 0:
+                offset -= 1
+            TERM.hold = True
+            clear(0x221115)
+            echo("-------================[ CHOOSE FILES ]================-------", center = TERM.w, color = 0xff0088, font = FONT.b)
+            term.fill(rgb(0x443337), rect = (0, (cursor - offset + 2) * 16 + 12 + TERM.off.y, TERM.px.w, 16))
             if finding:
-                if search.lower() not in file_or_dir.lower():
+                search = ' "' + search + '" '
+                echo_n(search, center = TERM.w, char = "-", font = FONT.r)
+                search = search[2:-2]
+            else:
+                echo_n(f" {directory[-TERM.w + 10:]} ", center = TERM.w, char = "-", font = FONT.r)
+            echo(color = 0xaaaaaa)
+            event = None
+            for thing in ls[:]:
+                if os.path.isdir(directory + thing):
                     continue
-            added.append(file_or_dir)
-            if term_y == 28 or file_or_dir not in tls:
+                elif not any(thing.lower().endswith(x) for x in file_formats):
+                    ls.remove(thing)
+            added = []
+            tls = ls[offset:]
+            for file_or_dir in ls:
+                if finding:
+                    if search.lower() not in file_or_dir.lower():
+                        continue
+                added.append(file_or_dir)
+                if TERM.y == TERM.h - 2 or file_or_dir not in tls:
+                    continue
+                if os.path.isdir(directory + file_or_dir):
+                    echo("[ " + file_or_dir[:TERM.w + 10] + "/ ]", color = 0xaaaaaa)
+                else:
+                    if directory + file_or_dir in queue:
+                        echo(file_or_dir[:TERM.w + 10], color = 0xffffff)
+                    else:
+                        echo(file_or_dir[:TERM.w + 10], color = 0xaaaaaa)
+            if finding and cursor >= len(added) and len(added) != 26:
+                cursor = 0
+                offset = 0
+            TERM.foot()
+            echo(f"[{cursor + 1}/{len(added)}]", right = TERM.w, char = "-", color = 0x880044, font = FONT.b)
+            if alt:
+                echo_n("a - Toggle all  /  f - Toggle search  /  F1 - More screens")
+            else:
+                echo_n("ALT - Use shortcut  /  ENTER - ")
+                if os.path.isdir(directory + ls[cursor]):
+                    echo_n("Open folder  /  F2 - ")
+                    if ls[cursor] == ".." and directory in prefs["search_dirs"]:
+                        echo_n("Remove folder from search")
+                    elif directory + ls[cursor] + "/" not in prefs["search_dirs"]:
+                        echo_n("Add folder to search")
+                    else:
+                        echo_n("Remove folder from search")
+                elif directory + ls[cursor] in queue:
+                    echo_n("Remove file from queue")
+                else:
+                    echo_n("Add file to queue")
+            echo(";]", right = TERM.rem)
+            redraw()
+        evt = None
+        event = None
+        skip_draw = False
+        while evt is None:
+            evt = pygame.event.wait()
+            if evt.type in EVT["QUIT"]:
+                kill()
+            elif evt.type in [*EVT["INPUT"], *EVT["MOUSEMOVE"], *EVT["KEYDOWN"], *EVT["WHEEL"], *EVT["CLICK"]]:
+                event = evt
+                rep = False
+            elif evt.type in EVT["WINDOW"]:
+                event = evt
+            else:
                 continue
-            if os.path.isdir(directory + file_or_dir):
-                echo("[ " + file_or_dir[-40:] + "/ ]", color = 0xaaaaaa)
-            else:
-                if directory + file_or_dir in queue:
-                    echo(file_or_dir[-60:], color = 0xffffff)
-                else:
-                    echo(file_or_dir[-60:], color = 0xaaaaaa)
-        if finding and cursor >= len(added) and len(added) != 26:
-            cursor = 0
-            offset = 0
-        term_y = 28
-        echo(f"{'[' + str(cursor + 1) + '/' + str(len(added)) + ']':->80}", color = 0x880044, font = font_b)
-        if alt:
-            echo("a - Toggle all  /  f - Toggle search  /  F1 - More screens                    ;]")
-        else:
-            echo_n("ALT - Use shortcut  /  ENTER - ")
-            if os.path.isdir(directory + ls[cursor]):
-                echo_n("Open folder  /  F2 - ")
-                if ls[cursor] == ".." and directory in prefs["search_dirs"]:
-                    echo("Remove folder from search ;]")
-                elif directory + ls[cursor] + "/" not in prefs["search_dirs"]:
-                    echo("Add folder to search      ;]")
-                else:
-                    echo("Remove folder from search ;]")
-            elif directory + ls[cursor] in queue:
-                echo("Remove file from queue                         ;]")
-            else:
-                echo("Add file to queue                              ;]")
-        redraw()
-        evt = pygame.event.wait()
-        if evt.type in EVT["QUIT"]:
-            kill()
-        elif evt.type in [*EVT["INPUT"], *EVT["KEY"], *EVT["KEYDOWN"], *EVT["WHEEL"], *EVT["CLICK"]]:
-            event = evt
-            rep = False
-        elif evt.type in EVT["WINDOW"]:
-            pygame.display.update()
-        else:
-            continue
-        print(f"\x1b[94;1m{evt.type}\x1b[0m:", evt)
+        try_print(f"\x1b[94;1m{evt.type}\x1b[0m:", evt)
         if event is None:
+            skip_draw = True
             continue
         if event.type in EVT["KEYDOWN"]:
-            if event.scancode == KEY["UP"] or event.scancode == KEY["LEFT"]:
+            if event.scancode == KEY["UP"]:
                 if cursor - 1 >= 0:
                     cursor -= 1
-                if offset > cursor and offset - 1 >= 0:
-                    offset -= 1
                 alt = False
-            elif event.scancode == KEY["DOWN"] or event.scancode == KEY["RIGHT"]:
+            elif event.scancode == KEY["DOWN"]:
                 if cursor + 1 < len(added):
                     cursor += 1
-                if offset + 25 < cursor and offset + 1 < len(added):
-                    offset += 1
                 alt = False
             elif evt.scancode == KEY["ENTER"]:
                 if os.path.isdir(directory + added[cursor]):
                     if added[cursor] == "..":
-                        directory = directory.rsplit(folder, 2)[0] + folder
+                        directory = directory.rsplit(folder_slash, 2)[0] + folder_slash
                     else:
-                        directory = directory + added[cursor] + folder
+                        directory = directory + added[cursor] + folder_slash
                     ls = [".."] + os.listdir(directory)
                     ls.sort()
                     cursor = 0
@@ -123,13 +130,13 @@ def file_chooser():
                 alt = not alt
             elif evt.scancode == KEY["BKSP"] and finding:
                 search = search[:-1]
-            elif evt.scancode == KEY["F1"]:
+            elif evt.scancode == KEY["F1"] and alt:
                 return "f1"
             elif evt.scancode == KEY["F2"]:
-                if directory + ls[cursor] + "/" in prefs["search_dirs"]:
-                    prefs["search_dirs"].remove(directory + ls[cursor] + "/")
+                if directory + ls[cursor] + folder_slash in prefs["search_dirs"]:
+                    prefs["search_dirs"].remove(directory + ls[cursor] + folder_slash)
                 else:
-                    prefs["search_dirs"].append(directory + ls[cursor] + "/")
+                    prefs["search_dirs"].append(directory + ls[cursor] + folder_slash)
                 open("conf.json", "w").write(json.dumps(prefs, indent = "    "))
         elif event.type in EVT["INPUT"] and event.text:
             if alt:
@@ -156,8 +163,6 @@ def file_chooser():
                         break
                     if cursor + 1 < len(ls):
                         cursor += 1
-                    if offset + 25 < cursor and offset + 1 < len(ls):
-                        offset += 1
                 else:
                     cursor, offset = og_cur
             alt = False
@@ -165,31 +170,16 @@ def file_chooser():
             if event.y == 1:
                 if cursor - 1 >= 0:
                     cursor -= 1
-                if offset > cursor and offset - 1 >= 0:
-                    offset -= 1
-                alt = False
             elif event.y == -1:
                 if cursor + 1 < len(added):
                     cursor += 1
-                if offset + 25 < cursor and offset + 1 < len(added):
-                    offset += 1
-                alt = False
         elif event.type in EVT["CLICK"]:
             if event.button == 1:
-                if os.path.isdir(directory + added[cursor]):
-                    if added[cursor] == "..":
-                        directory = directory.rsplit(folder, 2)[0] + folder
-                    else:
-                        directory = directory + added[cursor] + folder
-                    ls = [".."] + os.listdir(directory)
-                    ls.sort()
-                    cursor = 0
-                    offset = 0
-                else:
-                    if directory + added[cursor] in queue:
-                        queue.remove(directory + added[cursor])
-                    else:
-                        queue.append(directory + added[cursor])
-                alt = False
+                kb_press(Key.enter)
             elif event.button == 3:
                 alt = not alt
+        elif event.type in EVT["MOUSEMOVE"]:
+            t1 = cursor
+            cursor = offset + min(max(int((event.pos[1] - 16 * 3) / 16), 0), min(TERM.h - 5, len(added) - 1))
+            if int(t1) == int(cursor):
+                skip_draw = True

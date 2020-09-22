@@ -1,4 +1,11 @@
 {
     "search_dirs": [
+    ],
+    "shuffle": false,
+    "repeat": false,
+    "single": false,
+    "size": [
+        660,
+        500
     ]
 }
