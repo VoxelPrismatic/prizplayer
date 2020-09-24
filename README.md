@@ -7,15 +7,18 @@ for some reason plays the same track several times in a row in shuffle mode and 
 mode. I decided to make my own music player with a terminal aesthetic because that looks neat.
 
 # #] NOTICE
-This is still in the alpha phase, so you're going to have to install VLC and Python 3.7+ yourself.
+This is still in the development phase, so you're going to have to install VLC and Python 3.7+ yourself
+if you use Windows, macOS, or a Linux distro that doesn't use APT or DNF.
 
-For linux users, do not use the provided desktop file, because that is for my use only for now.
+For Linux users, do not use the provided desktop file, because that is for my use only for now. The APT/DNF 
+installer creates one and installs it for you, along with the necessary mime-types and icons.
 
 ### #] Projects
 Go over to [the projects page](/voxelprismatic/prizplayer/projects/1) to see what I still
 have to do
 
 # #] SCREENSHOTS [alpha]
+*these are out of date but the ui is basically the same
 ### #] Startup screen
 ![Startup screen](https://media.discordapp.net/attachments/569698278271090728/753658743887233104/unknown.png)
 ### #] Album viewer
