@@ -1,6 +1,11 @@
 # #] PRIZ PLAYER ;]
 A music player with a terminal aesthetic
 
+# #] HELP ME OUT ;]
+I'm not the smartest, but people sometimes need help. If you can, visit 
+[my issue](https://stackoverflow.com/questions/64049965/how-to-get-audio-samples-from-python-vlc) 
+and *please* help me.
+
 # #] REASON
 As a Kubuntu user, I've been using KDE's Elisa for quite a while. Elisa is a slow music player that
 for some reason plays the same track several times in a row in shuffle mode and cannot enter single track
