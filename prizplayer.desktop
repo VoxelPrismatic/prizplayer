@@ -1,0 +1,11 @@
+#!/usr/bin/env xdg-open
+[Desktop Entry]
+Name=PRIZ PLAYER ;]
+Path=/home/priz/TRANSFER/prizplayer
+Comment=A music player with a terminal aesthetic
+GenericName=Music Player
+Exec=/home/priz/TRANSFER/prizplayer/prizplayer.py
+Icon=/home/priz/TRANSFER/prizplayer/assets/icon.png
+Type=Application
+Categories=Audio;AudioVideo
+MimeType=audio/aac;audio/mp4;audio/mpeg;audio/mpegurl;audio/vnd.rn-realaudio;audio/vorbis;audio/x-flac;audio/x-mp3;audio/x-mpegurl;audio/x-ms-wma;audio/x-musepack;audio/x-oggflac;audio/x-pn-realaudio;audio/x-scpls;audio/x-speex;audio/x-vorbis;audio/x-wav;application/x-ogm-audio;audio/x-vorbis+ogg;audio/ogg;audio/prizplaylist;inode/directory;

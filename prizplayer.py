@@ -107,6 +107,7 @@ def kill():
     prefs["repeat"] = repeat
     prefs["single"] = single
     prefs["size"] = list(pygame.display.get_window_size())
+    prefs["enqueue"] = enqueue
     open("conf.json", "w+").write(json.dumps(prefs, indent = 4))
     open("./cache/running", "w+").write("False")
     os.system(f"kill -s 9 {os.getpid()}")
@@ -214,6 +215,12 @@ try:
         elif evt.type in EVT["INPUT"]:
             if evt.text in __available_keys:
                 _screen_management_(evt.text)
+            elif evt.text in "+=":
+                skip_draw = False
+                FONT.change_size(FONT.size + 2)
+            elif evt.text in "-_":
+                FONT.change_size(FONT.size - 2)
+                skip_draw = False
         elif evt.type in EVT["KEY"] and evt.scancode == KEY["F1"]:
             _screen_management_("f1")
         try_print(f"\x1b[94;1m{evt.type}\x1b[0m:", evt)

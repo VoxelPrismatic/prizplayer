@@ -7,10 +7,11 @@
 
 import threading
 import logging
+import pydub
 logging.basicConfig(level = 'INFO')
 
-enqueue = 0
 just_enqueued = 0
+enqueue = 0
 music = None
 media = None
 prefs = json.loads(open("conf.json").read())
@@ -27,8 +28,28 @@ unqueue = []
 lastqueue = []
 openedqueue = []
 openedtime = time.monotonic()
+sound = None
+wait_for_sound = True
+sound_itme = 0
+sound_samples = []
 
-def handle_player_click(event, seconds):
+def vlc_callback(*a, **kw):
+    print(a, kw)
+
+def pydub_sound(*queue_):
+    global enqueue, sound, wait_for_sound, sound_samples
+    wait_for_sound = True
+    print("\n" * 10, "LOADING")
+    sound = pydub.AudioSegment.from_file(queue_[enqueue])
+    aud = sound.raw_data
+    samp = []
+    #for b in range(0, len(aud), 2):
+        #samp.append(-(aud[b + 1] - aud[b] + 1))
+    sound_samples = samp
+    print("\n" * 10, "---")
+    wait_for_sound = False
+
+def handle_player_click(event, seconds, forceclick = False):
     global TERM, music, enqueue, queue, unqueue, shuffle, repeat, single, paused
     try:
         pos = event.pos
@@ -41,27 +62,34 @@ def handle_player_click(event, seconds):
             btns = [event.buttons]
     except:
         btns = pygame.mouse.get_pressed()
+    if forceclick:
+        btns = [1, 3]
     half = TERM.w / 2
-    if pos[1] >= (TERM.h - 3) * 16 and pos[1] <= (TERM.h - 2) * 16:
-        if pos[0] >= (half - 2) * 8 and pos[0] <= (half + 6) * 8:
+    if pos[1] >= (TERM.h - 4) * FONT.size + TERM.border.y and pos[1] <= (TERM.h - 3) * FONT.size + TERM.border.y:
+        if pos[0] >= (half - 2) * FONT.width and pos[0] <= (half + 6) * FONT.width:
             #Play/pause
             kb_press(Key.space)
-        elif pos[0] >= (half - 11) * 8 and pos[0] <= (half - 5) * 8:
+        elif pos[0] >= (half - 11) * FONT.width and pos[0] <= (half - 5) * FONT.width:
             #Rewind
             kb_press(Key.left)
-        elif pos[0] >= (half + 9) * 8 and pos[0] <= (half + 15) * 8:
+        elif pos[0] >= (half + 9) * FONT.width and pos[0] <= (half + 15) * FONT.width:
             #Fast forward
             kb_press(Key.right)
-        elif pos[0] >= (half - 20) * 8 and pos[0] <= (half - 14) * 8:
+        elif pos[0] >= (half - 20) * FONT.width and pos[0] <= (half - 14) * FONT.width:
             #Previous
             kb_press(Key.shift, ",")
-        elif pos[0] >= (half + 18) * 8 and pos[0] <= (half + 24) * 8:
+        elif pos[0] >= (half + 18) * FONT.width and pos[0] <= (half + 24) * FONT.width:
             #Next
             kb_press(Key.shift, ".")
-    elif pos[1] >= (TERM.h - 5) * 16 and pos[1] <= (TERM.h - 4) * 16 and any(btns):
-        x = pos[0] - TERM.border.x - 8 #Beginning bracket
-        if x >= 0 and x <= TERM.px.w - TERM.border.x - 8:
-            music.set_position(x / (TERM.px.w - 2 * (TERM.border.x + 8)))
+    elif pos[1] >= (TERM.h - 6) * FONT.size + TERM.border.y and pos[1] <= (TERM.h - 5) * FONT.size + TERM.border.y and any(btns):
+        x = pos[0] - TERM.border.x - FONT.width #Beginning bracket
+        if x >= 0 and x <= TERM.px.w - TERM.border.x - FONT.width:
+            music.set_position(x / (TERM.px.w - 2 * (TERM.border.x + FONT.width)))
+    elif pos[1] >= (TERM.h - 2) * FONT.size + TERM.border.y and pos[1] <= (TERM.h - 1) * FONT.size + TERM.border.y and any(btns):
+        if pos[0] <= FONT.width * 3 + TERM.border.x:
+            kb_press("s")
+        elif pos[0] >= FONT.width * 5 + TERM.border.x and pos[0] <= FONT.width * 7 + TERM.border.x :
+            kb_press("r")
 
 def ss(n):
     #Strip special, just returns lowercase with numbers and letters and _-
@@ -103,7 +131,7 @@ def fix_queue(again = True):
 
 
 def next_track(queue_, music, enqueue):
-    global unqueue, tags, now_playing, mpris, cover, player, media, now_playing_cover, paused
+    global unqueue, tags, now_playing, mpris, cover, player, media, now_playing_cover, paused, sound
     fix_queue()
     if music is not None:
         music.stop()
@@ -113,8 +141,10 @@ def next_track(queue_, music, enqueue):
     #media = vlc.Media(queue_[enqueue])
     #media.parse()
     music.play()
+    t = threading.Timer(0.01, pydub_sound, queue_)
+    t.start()
     i = music.get_instance()
-    i.set_app_id("com.priz.player", "1.4.8.BETA", "/home/priz/TRANSFER/prizplayer/assets/icon.png")
+    i.set_app_id("com.priz.player", "1.4.8.BETA", "x-audio-prizplaylist")
     i.set_user_agent("PRIZ PLAYER ;]", "PrizPlayer/1.4.8.BETA")
     paused = False
     try_print(f"\x1b[92;1mPlaying track {enqueue}\x1b[0m")
@@ -163,7 +193,7 @@ def timer_end_of_track():
             try_print(";]")
     except Exception as ex:
         try:
-            open("/home/priz/TRANSFER/prizplayer/tb.txt", "w+").write(
+            open(f"/home/{os.getlogin()}/.config/prizplayer/tb.txt", "w+").write(
                 f"\n{str(type(ex))[8:-2]}: {ex}"
                 "\n".join(traceback.format_tb(ex.__traceback__))
             )
@@ -193,9 +223,6 @@ def check_end_of_track():
     global enqueue, unqueue, music, queue, paused, shuffle, repeat, single, tags
     global alt_cover, media
     fix_queue()
-    i = music.get_instance()
-    i.set_app_id("com.priz.player", "1.4.8.BETA", "/home/priz/TRANSFER/prizplayer/assets/icon.png")
-    i.set_user_agent("PRIZ PLAYER ;]", "PrizPlayer/1.4.8.BETA")
     if (music is None or now_playing not in queue) and queue:
         music = next_track(queue, music, min(enqueue, len(queue) - 1))
         if paused:
@@ -209,6 +236,9 @@ def check_end_of_track():
         return
     elif music is None:
         return
+    i = music.get_instance()
+    i.set_app_id("com.priz.player", "1.4.8.BETA", "x-audio-prizplaylist")
+    i.set_user_agent("PRIZ PLAYER ;]", "PrizPlayer/1.4.8.BETA")
     if str(music.get_state()) not in ["State.Ended", "State.Stopped"]:
         pass
     elif single:
@@ -255,8 +285,13 @@ def check_end_of_track():
 
 def handle_dbus(event = True):
     try:
-        global mpris, mpris_event
-        try_print(dir(mpris))
+        global mpris, mpris_event, music
+        if music:
+            i = music.get_instance()
+            i.set_app_id("com.priz.player", "1.4.8.BETA", "x-audio-prizplaylist")
+            i.set_user_agent("PRIZ PLAYER ;]", "PrizPlayer/1.4.8.BETA")
+
+        #try_print(dir(mpris))
         mpris_event = event
         mpris_server.base.dbus_emit_changes(
             mpris.player,
@@ -268,24 +303,33 @@ def handle_dbus(event = True):
 def show_player():
     global enqueue, music, repeat, shuffle, single, queue
     global paused, tags, unqueue, in_player, mpris_event
-    global TERM
+    global TERM, sound, wait_for_sound, sound_samples
     prefs = json.loads(open(s("./conf.json")).read())
     alt = False
+    ctrl = False
     in_player = True
     skip_draw = False
     dragging = False
+    mpris_event = False
+    old_width_samples = []
+    width_averaging = 3
+    samples_width = 64
+    tmss = time.monotonic()
     while True:
         fix_queue()
-        if not skip_draw:
+        if not skip_draw or mpris_event:
             TERM.hold = True
             clear(0x112222)
             echo("--------===============[ PRIZ PLAYER ;] ]===============--------", center = TERM.w, color = 0x00ffff, font = FONT.b)
             echo("-" * TERM.w, font = FONT.r)
         if len(queue):
-            if not skip_draw:
+            if not skip_draw or mpris_event:
                 enqueue = min(enqueue, len(queue) - 1)
                 if music is None:
                     music = next_track(queue, music, enqueue)
+                i = music.get_instance()
+                i.set_app_id("com.priz.player", "1.4.8.BETA", "x-audio-prizplaylist")
+                i.set_user_agent("PRIZ PLAYER ;]", "PrizPlayer/1.4.8.BETA")
                 try:
                     tags = tinytag.TinyTag.get(queue[enqueue], image = True)
                     cover = tags.get_image() or open(s("./assets/icon.png"), "rb").read()
@@ -330,24 +374,25 @@ def show_player():
                             open(s("./assets/icon.png"), "rb")
                         )
                     )
-                img = pygame.transform.smoothscale(img, (156, 156))
-                term.blit(img, (TERM.px.w - 166 - TERM.off.x, 48, 156, 156))
+
+                img = pygame.transform.smoothscale(img, IMG.hw)
+                term.blit(img, (TERM.px.w - IMG.w - TERM.border.x, 2 * FONT.size + TERM.border.y, IMG.w, IMG.h))
                 TERM.y = TERM.h - 4
                 echo_n(font = FONT.b)
                 play_color = 0x00ffff
                 pos = pygame.mouse.get_pos()
                 try_print(pos)
-                if pos[1] >= (TERM.h - 3) * 16 and pos[1] <= (TERM.h - 2) * 16:
+                if pos[1] >= (TERM.h - 4) * FONT.size + TERM.border.y and pos[1] <= (TERM.h - 3) * FONT.size + TERM.border.y:
                     try_print(".")
                     half = TERM.w / 2
-                    if pos[0] >= (half - 2) * 8 and pos[0] <= (half + 6) * 8:
+                    if pos[0] >= (half - 2) * FONT.width and pos[0] <= (half + 6) * FONT.width:
                         color = 0xffffff
                     else:
                         color = 0x00ffff
                     echo("                  [   /  ]                  ", center = TERM.w, color = color)
                     play_color = color
                     TERM.y -= 1
-                    if pos[0] >= (half - 11) * 8 and pos[0] <= (half - 5) * 8:
+                    if pos[0] >= (half - 11) * FONT.width and pos[0] <= (half - 5) * FONT.width:
                         color = 0xffffff
                     else:
                         color = 0x00ffff
@@ -355,7 +400,7 @@ def show_player():
                     TERM.y -= 1
                     echo("           <<                               ", center = TERM.w, y_offset = 1)
                     TERM.y -= 1
-                    if pos[0] >= (half + 9) * 8 and pos[0] <= (half + 15) * 8:
+                    if pos[0] >= (half + 9) * FONT.width and pos[0] <= (half + 15) * FONT.width:
                         color = 0xffffff
                     else:
                         color = 0x00ffff
@@ -363,7 +408,7 @@ def show_player():
                     TERM.y -= 1
                     echo("                               >>           ", center = TERM.w, y_offset = 1)
                     TERM.y -= 1
-                    if pos[0] >= (half - 20) * 8 and pos[0] <= (half - 14) * 8:
+                    if pos[0] >= (half - 20) * FONT.width and pos[0] <= (half - 14) * FONT.width:
                         color = 0xffffff
                     else:
                         color = 0x00ffff
@@ -371,7 +416,7 @@ def show_player():
                     TERM.y -= 1
                     echo("   <                                        ", center = TERM.w, y_offset = 1)
                     TERM.y -= 1
-                    if pos[0] >= (half + 18) * 8 and pos[0] <= (half + 24) * 8:
+                    if pos[0] >= (half + 18) * FONT.width and pos[0] <= (half + 24) * FONT.width:
                         color = 0xffffff
                     else:
                         color = 0x00ffff
@@ -412,13 +457,20 @@ def show_player():
                 for x, y, z in vols:
                     term.fill(
                         rgb(z),
-                        rect = (82 + TERM.off.x, TERM.y * 16 + 16 + TERM.off.y, 64 * min(max(0, vol - x) / y, 1), 8)
+                        rect = (
+                            9 * FONT.width + TERM.border.x,
+                            TERM.y * FONT.size + TERM.border.y + round(FONT.width * 3 / 4),
+                            8 * FONT.width * min(max(0, vol - x) / y, 1),
+                            FONT.width
+                        )
                     )
                 echo(f"[{vol}%]-[{enqueue + 1}/{len(queue)}]", right = TERM.rem, char = "-")
-                if alt:
-                    echo_n("F1 - More Screens  /  <- - Prev track  /  -> - Next track")
+                if ctrl:
+                    echo_n("CTRL // q - Show queue  /  m - Show albums")
+                elif alt:
+                    echo_n("ALT // <- - Prev track  /  -> - Next track  /  F1 - Help")
                 else:
-                    echo_n("ALT - Shortcut  /  ")
+                    echo_n("ALT/CTRL - Shortcut  /  ")
                     if single:
                         echo_n("r - No loop  /  ")
                     elif repeat:
@@ -430,7 +482,6 @@ def show_player():
                     else:
                         echo_n("s - Shuffle")
                 echo(";]", right = TERM.rem)
-            event = None
             skip_draw = False
             seconds = int(music.get_length() / 1000)
             total_time = seconds
@@ -441,18 +492,25 @@ def show_player():
             handle_dbus(event = False)
             vol = music.audio_get_volume()
             mute = music.audio_get_mute()
-
             #tracks = media.tracks_get()
+            event = None
+            mpris_event = False
+            resync_ms = False
             while event is None and str(music.get_state()) not in ["State.Ended", "State.Stopped"] and \
                 not mpris_event and vol == music.audio_get_volume() and mute == music.audio_get_mute():
+                TERM.hold = True
+                tt = time.monotonic()
                 if music.get_position() != last_position:
+                    if last_position != -1 or old_width_samples == []:
+                        mtt = time.monotonic()
                     #try_print(unqueue)
                     #try_print(music.audio_get_volume())
                     #try_print(dir(music))
+                    #try_print(music.get_media().get_stats(None))
+                    #try_print(json.dumps(music.get_instance().vlm_show_media(""), indent = 4))
                     #try_print(dir(tracks))
                     #try_print(dir(vlc))
                     #try_print(music.get_state())
-                    TERM.hold = True
                     seconds = max(int(music.get_position() * music.get_length() / 1000), 0)
                     rem_sec = total_time - seconds
                     minutes = int(seconds / 60)
@@ -461,7 +519,7 @@ def show_player():
                     rem_sec %= 60
                     TERM.y = TERM.h - 7
                     rem_time = f"-{rem_min:02}:{rem_sec:02}"
-                    term.fill(rgb(0x112222), rect = (0, TERM.y * 16 + 12 + TERM.off.y, TERM.px.w, 48))
+                    term.fill(rgb(0x112222), rect = (0, TERM.y * FONT.size + TERM.border.y, TERM.px.w, FONT.size * 3))
                     echo(f"{minutes:02}:{seconds:02}", font = FONT.b, color = 0x00ffff)
                     TERM.y -= 1
                     echo(song_time, right = TERM.w)
@@ -469,32 +527,111 @@ def show_player():
                     TERM.y -= 1
                     term.fill(
                         rgb(0x00ffff), rect = (
-                            18 + TERM.off.x,
-                            TERM.y * 16 + 16 + TERM.off.y,
-                            (TERM.px.w - TERM.off.x * 2 - 36) * music.get_position(),
-                            8
+                            FONT.width + TERM.border.x,
+                            TERM.y * FONT.size + TERM.border.y + round(FONT.width * 3 / 4),
+                            (TERM.px.w - TERM.off.x * 2 - (FONT.width + TERM.border.x) * 2) * music.get_position(),
+                            FONT.width
                         )
                     )
                     TERM.y += 1
                     echo(rem_time, right = TERM.w)
                     last_position = music.get_position()
                     try_print(time.monotonic(), last_position)
-                    redraw()
-                time.sleep(0.01)
+                if False:#not paused and not wait_for_sound:
+                    print("\x1b[93;1m", int((time.monotonic() - tmss) * 1000), music.get_time(), int(music.get_length() * music.get_position()), "\x1b[0m")
+                    nnn = int((time.monotonic() - tmss) * 1000) / music.get_time()
+                    print("\x1b[94;1m", nnn, "\x1b[0m")
+                    try:
+                        old_width_samples.append(width_samples)
+                        if len(old_width_samples) == width_averaging:
+                            old_width_samples = old_width_samples[1:]
+                    except:
+                        pass
+#                    sound_sample_length_ms = len(sound_samples) / tags.samplerate * 1000 / tags.channels
+ #                   music_length_ms = music.get_length()
+                    ms = music.get_length() * music.get_position() + (time.monotonic() - mtt) * 1000# + (music_length_ms - sound_sample_length_ms) / 2
+                    ms *= 8 * nnn - 7# (len(sound_samples) / tags.samplerate * 1000 / tags.channels) / music.get_length()
+                    ms = round(ms)
+                    #print("\x1b[93;1m", ms, music.get_time(), "\x1b[0m")
+                    rt = int(tags.samplerate / 1000)
+                    #ms = int((time.monotonic() - tmss) * 1000) / (2.5 * nnn - 1.5)
+                    #samples = sound_samples[ms * rt * tags.channels:(ms + 64) * rt * tags.channels]
+                    samples = sound[ms:ms+64].get_array_of_samples()
+                    #print(samples)
+                    width_samples = []
+                    step = 16
+                    voldub = music.audio_get_volume() / 100
+                    try:
+                        for sample in range(0, len(samples), step):
+                            #print(samples[sample:sample + step])
+                            width_samples.append(abs(sum(samples[sample:sample + step])) / step / 510 * 2 * voldub)
+                        #print(width_samples)
+                        #print(width_samples, len(width_samples), TERM.w)
+                        if old_width_samples:
+                            n_s = -1
+                            max_samples = []
+                            for old_samples in old_width_samples:
+                                n_s += 1
+                                if n_s == 0:
+                                    for x in range(min(len(old_samples), len(width_samples))):
+                                        if width_samples[x] > old_samples[x]:
+                                            try:
+                                                for y in range(len(old_width_samples)):
+                                                    old_width_samples[y][x] = width_samples[x]
+                                            except IndexError:
+                                                #Lazy check
+                                                pass
+                                        width_samples[x] += old_samples[x]
+                                else:
+                                    for x in range(min(len(old_samples), len(width_samples))):
+                                        width_samples[x] += old_samples[x]
+                            for x in range(len(width_samples)):
+                                width_samples[x] /= (len(old_width_samples) + 1)
+                        height = TERM.px.h - 20 * FONT.size - TERM.border.y
+                        bar_width = (TERM.px.w - 2 * TERM.border.x) / len(width_samples)
+                        term.fill(rgb(0x112222), rect = (0, 12 * FONT.size + TERM.border.y, TERM.px.w, height))
+                        for x in range(len(width_samples)):
+                            term.fill(
+                                rgb(0x00ffff), rect = (
+                                    bar_width * x + TERM.border.x,
+                                    12 * FONT.size + TERM.border.y + height - height * min(width_samples[x], 1),
+                                    (bar_width * 1.5),
+                                    height * min(width_samples[x], 1)
+                                )
+                            )
+                            if width_samples[x] > 1:
+                                temp_sample = min(width_samples[x] - 1, 1)
+                                term.fill(
+                                    rgb(0xff0000), rect = (
+                                        bar_width * x + TERM.border.x,
+                                        12 * FONT.size + TERM.border.y + height - height * temp_sample,
+                                        (bar_width * 1.5),
+                                        height * temp_sample
+                                    )
+                                )
+                    except (ZeroDivisionError, IndexError, pydub.exceptions.TooManyMissingFrames):
+                        TERM.y = TERM.h - 9
+                        echo("*end of track", center = TERM.w, cls = True)
+                    time.sleep(max(samples_width / 1000 - time.monotonic() + tt, 0))
+                else:
+                    TERM.y = TERM.h - 9
+                    #if paused:
+                        #echo("*paused", center = TERM.w, cls = True)
+                    #else:
+                        #echo("just a sec ;]", center = TERM.w, cls = True)
+                    time.sleep(samples_width / 1000)
+                redraw()
                 for evt in pygame.event.get():
                     if evt.type in EVT["QUIT"]:
                         kill()
                     elif evt.type in [*EVT["INPUT"], *EVT["MOUSEMOVE"], *EVT["KEYDOWN"], *EVT["WHEEL"], *EVT["CLICK"]]:
                         event = evt
                     elif evt.type in EVT["WINDOW"]:
-                        if evt.type == 32768 and evt.gain == 1:
-                            handle_player_click(evt, seconds)
-                            mpris_event = True
-                            continue
-                        t = pygame.display.get_window_size()
-                        if t[0] != TERM.w or t[1] != TERM.h or list(pygame.display.get_surface().get_at((5, 5))) == [0, 0, 0, 255]:
-                            mpris_event = True
-                        redraw()
+                        mpris_event = True
+                        if evt.type == 32768 and evt.gain == 1 and evt.state == 1:
+                            handle_player_click(None, None, True)
+
+
             check_end_of_track()
             try:
                 try_print(f"\x1b[94;1m{evt.type}\x1b[0m:", event)
@@ -511,21 +648,27 @@ def show_player():
                     if paused:
                         music.pause()
                     else:
+                        ms = music.get_time()
                         music.play()
                 if event.scancode == KEY["LEFT"]:
                     if alt:
                         kb_press(Key.shift, ",")
+                        ms = music.get_time()
+                        alt = False
+                        tmss = time.monotonic()
                     else:
                         music.set_position(max(music.get_position() - 5000 / music.get_length(), 0))
                         pygame.key.set_repeat(500, 500)
-                    alt = False
+                        tmss += 5
                 elif event.scancode == KEY["RIGHT"]:
                     if alt:
                         kb_press(Key.shift, ".")
+                        alt = False
                     else:
                         music.set_position(min(music.get_position() + 5000 / music.get_length(), 1))
                         pygame.key.set_repeat(500, 500)
-                    alt = False
+                        tmss -= 5
+                    ms = music.get_time()
                 elif event.scancode == KEY["UP"]:
                     music.audio_set_volume(min(200, int(music.audio_get_volume() / 2) * 2 + 2))
                     pygame.key.set_repeat(500, 5)
@@ -534,17 +677,27 @@ def show_player():
                     pygame.key.set_repeat(500, 5)
                 elif event.scancode == KEY["ALT"]:
                     alt = not alt
+                    ctrl = False
                 elif event.scancode == KEY["F1"] and alt:
                     in_player = False
                     return "f1"
+                elif event.scancode == KEY["CTRL"]:
+                    ctrl = not ctrl
+                    alt = False
             elif event.type in EVT["INPUT"] and event.text:
-                if alt:
+                if ctrl:
                     if event.text in __available_keys:
                         in_player = False
                         return event.text
+                if alt:
+                    if event.text in "+=":
+                        FONT.change_size(FONT.size + 2)
+                    elif event.text in "-_":
+                        FONT.change_size(FONT.size - 2)
                 if event.text in " pPkK":
                     if paused:
                         music.play()
+                        ms = music.get_time()
                     else:
                         music.pause()
                     paused = not paused
@@ -576,26 +729,31 @@ def show_player():
                         music.stop()
                     else:
                         music.set_position(0)
+                    ms = music.get_time()
                 elif event.text in ">":
                     music.stop()
                     try_print(music.get_state())
+                    ms = music.get_time()
             elif event.type in EVT["WHEEL"]:
                 if event.y:
                     music.audio_set_volume(min(200, music.audio_get_volume() + event.y))
                 else:
                     music.set_position(max(min(music.get_position() - 2000 * event.x / music.get_length(), 1), 0))
+                    ms = music.get_time()
             elif event.type in EVT["CLICK"]:
                 handle_player_click(event, seconds)
             elif event.type in EVT["MOUSEMOVE"]:
+                skip_draw = True
                 if any(event.buttons):
-                    already = pos[1] >= (TERM.h - 9) * 16 and pos[1] <= (TERM.h - 2) * 16
-                    not_ready = pos[1] >= (TERM.h - 5) * 16 and pos[1] <= (TERM.h - 4) * 16
+                    already = pos[1] >= (TERM.h - 9) * FONT.size and pos[1] <= (TERM.h - 2) * FONT.size
+                    not_ready = pos[1] >= (TERM.h - 5) * FONT.size and pos[1] <= (TERM.h - 4) * FONT.size
                     if dragging and already or not_ready:
                         dragging = True
-                        x = pos[0] - TERM.border.x - 8 #Beginning bracket
-                        if x >= 0 and x <= TERM.px.w - TERM.border.x - 8:
-                            music.set_position(x / (TERM.px.w - 2 * (TERM.border.x + 8)))
-                        skip_draw = False
+                        x = pos[0] - TERM.border.x - FONT.width #Beginning bracket
+                        if x >= 0 and x <= TERM.px.w - TERM.border.x - FONT.width:
+                            music.set_position(x / (TERM.px.w - 2 * (TERM.border.x + FONT.width)))
+                            ms = music.get_time()
+                            skip_draw = False
                     else:
                         dragging = False
                 elif pos[1] >= (TERM.h - 4):
@@ -612,7 +770,7 @@ def show_player():
                 echo("Nothing is in the recent queue either")
             TERM.foot()
             echo("-" * TERM.w, font = FONT.b, color = 0x008888)
-            echo_n("o - Open file  /  m - Your albums  /  F1 - More screens")
+            echo_n("Press a shortcut key")
             echo(";]", right = TERM.rem)
             redraw()
             evt = None
@@ -630,7 +788,10 @@ def show_player():
                     continue
                 if event.type in EVT["KEYDOWN"]:
                     if event.scancode == KEY["ENTER"]:
-                        enqueue = 0
+                        try:
+                            enqueue = int(prefs["enqueue"])
+                        except:
+                            enqueue = 0
                         queue = open("./queues/LATEST.PRZ").read().split("\n")
                         in_player = False
                         return "p"
@@ -638,4 +799,8 @@ def show_player():
                     if evt.text in __available_keys:
                         in_player = False
                         return evt.text
+                    elif event.text in "+=":
+                        FONT.change_size(FONT.size + 2)
+                    elif event.text in "-_":
+                        FONT.change_size(FONT.size - 2)
 

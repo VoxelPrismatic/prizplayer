@@ -1,11 +1,16 @@
 {
     "search_dirs": [
+        "/home/priz/Music/Artificial Music/",
+        "/home/priz/Music/C418/",
+        "/home/priz/Music/"
     ],
-    "shuffle": false,
-    "repeat": false,
+    "shuffle": true,
+    "repeat": true,
     "single": false,
     "size": [
-        660,
-        500
-    ]
+        636,
+        468
+    ],
+    "font_size": 16,
+    "enqueue": 0
 }

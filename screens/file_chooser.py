@@ -18,6 +18,7 @@ def file_chooser():
     ls.sort()
     finding = False
     alt = False
+    ctrl = False
     added = []
     prefs = json.loads(open("conf.json").read())
     skip_draw = False
@@ -29,8 +30,8 @@ def file_chooser():
                 offset -= 1
             TERM.hold = True
             clear(0x221115)
-            echo("-------================[ CHOOSE FILES ]================-------", center = TERM.w, color = 0xff0088, font = FONT.b)
-            term.fill(rgb(0x443337), rect = (0, (cursor - offset + 2) * 16 + 12 + TERM.off.y, TERM.px.w, 16))
+            echo("--------================[ CHOOSE FILES ]================--------", center = TERM.w, color = 0xff0088, font = FONT.b)
+            term.fill(rgb(0x443337), rect = cursor_highlight(cursor - offset + 2))
             if finding:
                 search = ' "' + search + '" '
                 echo_n(search, center = TERM.w, char = "-", font = FONT.r)
@@ -66,17 +67,17 @@ def file_chooser():
             TERM.foot()
             echo(f"[{cursor + 1}/{len(added)}]", right = TERM.w, char = "-", color = 0x880044, font = FONT.b)
             if alt:
-                echo_n("a - Toggle all  /  f - Toggle search  /  F1 - More screens")
+                echo_n("a - Toggle all  /  f - Toggle search  /  F1 - Help")
             else:
                 echo_n("ALT - Use shortcut  /  ENTER - ")
                 if os.path.isdir(directory + ls[cursor]):
                     echo_n("Open folder  /  F2 - ")
                     if ls[cursor] == ".." and directory in prefs["search_dirs"]:
-                        echo_n("Remove folder from search")
+                        echo_n("Remove from search")
                     elif directory + ls[cursor] + "/" not in prefs["search_dirs"]:
-                        echo_n("Add folder to search")
+                        echo_n("Add to search")
                     else:
-                        echo_n("Remove folder from search")
+                        echo_n("Remove from search")
                 elif directory + ls[cursor] in queue:
                     echo_n("Remove file from queue")
                 else:
@@ -128,6 +129,10 @@ def file_chooser():
                 alt = False
             elif evt.scancode == KEY["ALT"]:
                 alt = not alt
+                ctrl = False
+            elif event.scancode == KEY["CTRL"]:
+                ctrl = not ctrl
+                alt = False
             elif evt.scancode == KEY["BKSP"] and finding:
                 search = search[:-1]
             elif evt.scancode == KEY["F1"] and alt:
@@ -139,10 +144,11 @@ def file_chooser():
                     prefs["search_dirs"].append(directory + ls[cursor] + folder_slash)
                 open("conf.json", "w").write(json.dumps(prefs, indent = "    "))
         elif event.type in EVT["INPUT"] and event.text:
-            if alt:
+            if ctrl:
                 if evt.text in __available_keys:
                     return evt.text
-                elif evt.text == "f":
+            elif alt:
+                if evt.text == "f":
                     finding = not finding
                 elif evt.text == "a":
                     for f in ls:
@@ -152,6 +158,10 @@ def file_chooser():
                             queue.remove(directory + f)
                         else:
                             queue.append(directory + f)
+                elif event.text in "+=":
+                    FONT.change_size(FONT.size + 2)
+                elif event.text in "-_":
+                    FONT.change_size(FONT.size - 2)
             elif finding:
                 search += event.text
             else:
@@ -168,10 +178,18 @@ def file_chooser():
             alt = False
         elif event.type in EVT["WHEEL"]:
             if event.y == 1:
-                if cursor - 1 >= 0:
+                if offset - 1 >= 0:
+                    offset -= 1
+                    if offset + TERM.h - 5 < cursor and cursor - 1 >= 0:
+                        cursor -= 1
+                elif cursor - 1 >= 0:
                     cursor -= 1
             elif event.y == -1:
-                if cursor + 1 < len(added):
+                if offset + 1 < len(added) - (TERM.h - 5):
+                    offset += 1
+                    if offset > cursor and cursor + 1 < len(added):
+                        cursor += 1
+                elif cursor + 1 < len(added):
                     cursor += 1
         elif event.type in EVT["CLICK"]:
             if event.button == 1:
@@ -180,6 +198,6 @@ def file_chooser():
                 alt = not alt
         elif event.type in EVT["MOUSEMOVE"]:
             t1 = cursor
-            cursor = offset + min(max(int((event.pos[1] - 16 * 3) / 16), 0), min(TERM.h - 5, len(added) - 1))
+            cursor = offset + mouse_cursor(event, 3, 5, added)
             if int(t1) == int(cursor):
                 skip_draw = True

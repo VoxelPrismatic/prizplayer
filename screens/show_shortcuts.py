@@ -10,34 +10,34 @@ def show_shortcuts():
     while True:
         TERM.hold = True
         clear(0x112215)
-        echo("-------=================[ SHORTCUTS ]=================--------", center = TERM.w, color = 0x00ff88, font = FONT.b)
+        echo("--------=================[ SHORTCUTS ]=================--------", center = TERM.w, color = 0x00ff88, font = FONT.b)
         echo_n(' These keys can be used anywhere ', center = TERM.w, font = FONT.r, char = "-")
         echo(color = 0xaaaaaa)
         event = None
         keys = {
-            "ALT + o": "Open file",
-            "ALT + p": "Player",
-            "ALT + q": "Show queue",
-            "ALT + s": "Save queue",
-            "ALT + l": "Load queue",
-            "ALT + c": "Configuration",
-            "ALT + m": "Show your albums",
+            "CTRL + o": "Open file",
+            "CTRL + p": "Player",
+            "CTRL + q": "Show queue",
+            "CTRL + s": "Save queue",
+            "CTRL + l": "Load queue",
+            "CTRL + c": "Configuration",
+            "CTRL + m": "Show your albums",
+            "CTRL + t": "Tips & Tricks",
             "ALT + F1": "This screen",
-            "ALT + t": "Tips & Tricks",
+            "ALT + +": "Increase font size",
+            "ALT + -": "Decrease font size"
         }
         for key in keys:
             echo_n(" " * 16 + key + " ", left = int(TERM.w / 2), char = "-", color = 0xeeeeee if TERM.y % 2 else 0xaaaaaa)
             echo(" " + keys[key] + " " * 16, right = int(TERM.w / 2), char = "-")
         echo()
-        echo(' PLAYER ONLY ', center = TERM.w, char = "-")
+        echo(' PLAYER ONLY ', center = TERM.w, char = "-", color = 0x00ff88)
         echo()
         keys = {
             "r": "Repeat all/one/none",
             "s": "Shuffle on/off",
             "ALT + ->": "Next track",
-            "SHIFT + .": "Next track",
             "ALT + <-": "Prev track",
-            "SHIFT + ,": "Prev track",
             "->": "Fast forward",
             "<-": "Rewind",
             "SPACE": "Pause",
@@ -49,7 +49,7 @@ def show_shortcuts():
             echo(" " + keys[key] + " " * 16, right = int(TERM.w / 2), char = "-")
         TERM.foot()
         echo("-" * TERM.w, color = 0x008844, font = FONT.b)
-        echo_n("Be sure to press alt")
+        echo_n("Press a shortcut key")
         echo(";]", right = TERM.rem)
         redraw()
         evt = pygame.event.wait()
@@ -68,3 +68,7 @@ def show_shortcuts():
         elif event.type in EVT["INPUT"] and event.text:
             if evt.text in __available_keys:
                 return evt.text
+            elif event.text in "+=":
+                FONT.change_size(FONT.size + 2)
+            elif event.text in "-_":
+                FONT.change_size(FONT.size - 2)

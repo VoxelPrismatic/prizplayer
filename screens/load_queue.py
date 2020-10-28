@@ -11,6 +11,7 @@ def load_queue():
     offset = 0
     name = ""
     finding = False
+    ctrl = False
     alt = False
     prefs = json.loads(open("conf.json").read())
     skip_draw = False
@@ -18,12 +19,12 @@ def load_queue():
         if not skip_draw:
             TERM.hold = True
             clear(0x151122)
-            echo("-------=================[ LOAD QUEUE ]=================-------", center = TERM.w, color = 0x8800ff, font = FONT.b)
-            term.fill(rgb(0x373344), rect = (0, (cursor - offset + 2) * 16 + 12 + TERM.off.y, TERM.px.w, 16))
+            echo("--------=================[ LOAD QUEUE ]=================--------", center = TERM.w, color = 0x8800ff, font = FONT.b)
+            term.fill(rgb(0x373344), rect = cursor_highlight(cursor - offset + 2))
             if finding:
-                search = ' "' + search + '" '
-                echo_n(search, center = TERM.w, char = "-", font = FONT.r)
-                search = search[2:-2]
+                name = ' "' + name + '" '
+                echo_n(name, center = TERM.w, char = "-", font = FONT.r)
+                name = name[2:-2]
             else:
                 echo_n(f" Pick a queue ", center = TERM.w, char = "-", font = FONT.r)
             echo(color = 0xaaaaaa)
@@ -42,10 +43,12 @@ def load_queue():
                 offset -= 1
             TERM.foot()
             echo(f"[{cursor + 1}/{len(ls)}]", right = TERM.w, char = "-", font = FONT.b, color = 0x440088)
+            if ctrl:
+                echo_n("CTRL // s - Save queue  /  q - Show queue")
             if alt:
-                echo_n("f - Toggle search  /  ENTER - Append to queue  /  F1 - More screens")
+                echo_n("ALT // f - Toggle search  /  ENTER - Append to queue  /  F1 - Help")
             else:
-                echo_n("ALT - Use Shortcut  /  ENTER - Load queue")
+                echo_n("ALT/CTRL - Use Shortcut  /  ENTER - Load queue")
             echo(";]", right = TERM.rem)
             redraw()
         evt = None
@@ -71,6 +74,10 @@ def load_queue():
                 name = name[:-1]
             elif evt.scancode == KEY["ALT"]:
                 alt = not alt
+                ctrl = False
+            elif event.scancode == KEY["CTRL"]:
+                ctrl = not ctrl
+                alt = False
             elif evt.scancode == KEY["ENTER"]:
                 f = open(s(f"./queues/{ls[cursor]}")).read().split("\n")
                 if alt:
@@ -82,24 +89,43 @@ def load_queue():
                 if cursor - 1 >= 0:
                     cursor -= 1
                 alt = False
+                ctrl = False
             elif event.scancode == KEY["DOWN"]:
                 if cursor + 1 < len(ls):
                     cursor += 1
                 alt = False
+                ctrl = False
             elif event.scancode == KEY["F1"] and alt:
                 return "f1"
         elif event.type in EVT["INPUT"]:
-            if alt:
+            if ctrl:
                 if event.text in __available_keys:
                     return event.text
+            if alt:
+                if event.text == "f":
+                    finding = not finding
+                    alt = False
+                    ctrl = False
+                elif event.text in "+=":
+                    FONT.change_size(FONT.size + 2)
+                elif event.text in "-_":
+                    FONT.change_size(FONT.size - 2)
             elif finding:
                 name += event.text
         elif event.type in EVT["WHEEL"]:
             if event.y == 1:
-                if cursor - 1 >= 0:
+                if offset - 1 >= 0:
+                    offset -= 1
+                    if offset + TERM.h - 5 < cursor and cursor - 1 >= 0:
+                        cursor -= 1
+                elif cursor - 1 >= 0:
                     cursor -= 1
             elif event.y == -1:
-                if cursor + 1 < len(ls):
+                if offset + 1 < len(ls) - (TERM.h - 5):
+                    offset += 1
+                    if offset > cursor and cursor + 1 < len(ls):
+                        cursor += 1
+                elif cursor + 1 < len(ls):
                     cursor += 1
         elif event.type in EVT["CLICK"]:
             if event.button == 1:
@@ -108,6 +134,6 @@ def load_queue():
                 alt = not alt
         elif event.type in EVT["MOUSEMOVE"]:
             t1 = cursor
-            cursor = offset + min(max(int((event.pos[1] - 16 * 3) / 16), 0), min(TERM.h - 5, len(ls) - 1))
+            cursor = offset + mouse_cursor(event, 3, 6, ls)
             if int(t1) == int(cursor):
                 skip_draw = True

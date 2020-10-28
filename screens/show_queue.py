@@ -10,6 +10,7 @@ def show_queue():
     cursor = 0
     offset = 0
     alt = False
+    ctrl = False
     search = ""
     finding = False
     refresh_tag = True
@@ -44,12 +45,12 @@ def show_queue():
         if not skip_draw:
             TERM.hold = True
             clear(0x112211)
-            echo("-------==================[ IN QUEUE ]==================-------", center = TERM.w, color = 0x00ff00, font = FONT.b)
+            echo("--------==================[ IN QUEUE ]==================--------", center = TERM.w, color = 0x00ff00, font = FONT.b)
             while offset + TERM.h - 5 < cursor and offset + 1 < len(added):
                 offset += 1
             while offset > cursor and offset - 1 >= 0:
                 offset -= 1
-            term.fill(rgb(0x334433), rect = (0, (cursor - offset + 2) * 16 + 12 + TERM.off.y, TERM.px.w, 16))
+            term.fill(rgb(0x334433), rect = cursor_highlight(cursor - offset + 2))
             if finding:
                 search = ' "' + search + '" '
                 echo(search, center = TERM.w, char = "-", font = FONT.r)
@@ -77,7 +78,7 @@ def show_queue():
                             t = "~/" + t.split("/home/" + os.getlogin() + "/", 1)[1]
                         elif t.startswith("C:\\Users\\" + os.getlogin() + "\\"):
                             t = "~\\" + t.split("C:\\Users\\" + os.getlogin() + "\\", 1)[1]
-                        echo(t[-70:], font = FONT.r)
+                        echo(t[-TERM.w + 10:], font = FONT.r)
                     elif len(track[0]) + len(track[1]) + len(track[2]) < TERM.w:
                         echo_n(f"{track[0]}", font = FONT.b)
                         echo_n(f" in ", font = FONT.r)
@@ -90,16 +91,18 @@ def show_queue():
                         echo_n(f"{track[2]}"[-int(TERM.w / 80 * 20):], font = FONT.b)
                         echo_n(f" by ", font = FONT.r)
                         echo_n(f"{track[1]}"[-int(TERM.w / 80 * 20):], font = FONT.b)
-                    seconds = int(queue_meta[c].duration)
+                    seconds = int(queue_meta[c].duration or 0)
                     minutes = int(seconds / 60)
                     seconds %= 60
                     echo(f" {minutes:02}:{seconds:02}", font = FONT.i)
             TERM.foot()
             echo(f"[{cursor + 1}/{len(added)}]", right = TERM.w, char = "-", font = FONT.b, color = 0x008800)
+            if ctrl:
+                echo_n("CTRL // l - Load queue  /  s - Save queue  /  F1 - Help")
             if alt:
-                echo_n("l - Load queue / s - Save queue / f - Toggle search / F1 - More screens")
+                echo_n("ALT // f - Toggle search")
             else:
-                echo_n("ALT - Use shortcut / DEL - Remove / ,/. - Up/down / ENTER - Play now")
+                echo_n("CTRL/ALT - Shortcut / DEL - Remove / ,/. - Up/down / ENTER - Play now")
             echo(";]", right = TERM.rem)
             redraw()
         evt = None
@@ -146,8 +149,12 @@ def show_queue():
                 queue.remove(added[cursor])
                 refresh_tag = True
                 alt = False
-            elif event.scancode == KEY["ALT"]:
+            elif evt.scancode == KEY["ALT"]:
                 alt = not alt
+                ctrl = False
+            elif event.scancode == KEY["CTRL"]:
+                ctrl = not ctrl
+                alt = False
             elif event.scancode == KEY["BKSP"] and finding:
                 search = search[:-1]
             elif event.scancode == KEY["F1"] and alt:
@@ -161,11 +168,16 @@ def show_queue():
                 except ValueError:
                     enqueue = cursor
         elif event.type in EVT["INPUT"] and event.text:
-            if alt:
+            if ctrl:
                 if event.text in __available_keys:
                     return event.text
-                elif event.text == "f":
+            elif alt:
+                if event.text == "f":
                     finding = not finding
+                elif event.text in "+=":
+                    FONT.change_size(FONT.size + 2)
+                elif event.text in "-_":
+                    FONT.change_size(FONT.size - 2)
             elif finding and event.text not in ",.":
                 search += event.text
             elif event.text == ",":
@@ -206,10 +218,18 @@ def show_queue():
             alt = False
         elif event.type in EVT["WHEEL"]:
             if event.y == 1:
-                if cursor - 1 >= 0:
+                if offset - 1 >= 0:
+                    offset -= 1
+                    if offset + TERM.h - 5 < cursor and cursor - 1 >= 0:
+                        cursor -= 1
+                elif cursor - 1 >= 0:
                     cursor -= 1
             elif event.y == -1:
-                if cursor + 1 < len(added):
+                if offset + 1 < len(added) - (TERM.h - 5):
+                    offset += 1
+                    if offset > cursor and cursor + 1 < len(added):
+                        cursor += 1
+                elif cursor + 1 < len(added):
                     cursor += 1
         elif event.type in EVT["CLICK"]:
             if event.button == 1:
@@ -221,7 +241,7 @@ def show_queue():
                 alt = not alt
         elif event.type in EVT["MOUSEMOVE"]:
             t1 = cursor
-            cursor = offset + min(max(int((event.pos[1] - 16 * 3) / 16), 0), min(TERM.h - 5, len(added) - 1))
+            cursor = offset + mouse_cursor(event, 3, 5, added)
             if int(t1) == int(cursor):
                 skip_draw = True
             elif event.buttons == (1, 0, 0):

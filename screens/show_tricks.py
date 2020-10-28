@@ -15,7 +15,7 @@ def show_tricks():
         echo()
         echo_s(
             "MPRIS is the communication standard that allows you to control the music player from, say, your bluetooth speaker/earbuds. "
-            "These tricks only apply to MPRIS devices.", 
+            "These tricks only apply to MPRIS devices.",
             color = 0xffffff)
         echo(color = 0xaaaaaa)
         echo("1] You can seek through the song")
@@ -45,3 +45,7 @@ def show_tricks():
         elif event.type in EVT["INPUT"] and event.text:
             if evt.text in __available_keys:
                 return evt.text
+            elif event.text in "+=":
+                FONT.change_size(FONT.size + 2)
+            elif event.text in "-_":
+                FONT.change_size(FONT.size - 2)

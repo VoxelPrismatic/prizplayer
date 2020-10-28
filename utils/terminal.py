@@ -18,14 +18,34 @@ if sys.platform == "linux":
 
 
 term = pygame.display.set_mode((0, 0))
-pygame.mixer.quit()
 img = pygame.Surface.convert(pygame.image.load("./assets/icon.png"))
 pygame.display.set_icon(img)
 pygame.display.set_caption("PRIZ PLAYER ;]")
-prefs = json.loads(open("conf.json").read())
+try:
+    prefs = json.loads(open("conf.json").read())
+except:
+    prefs = {}
+try:
+    prefs["size"]
+except KeyError:
+    prefs["size"] = 660, 500
+for x in ["shuffle", "single", "repeat"]:
+    try:
+        prefs[x]
+    except KeyError:
+        prefs[x] = False
+try:
+    prefs["search_dirs"]
+except KeyError:
+    prefs["search_dirs"] = []
+try:
+    prefs["font_size"]
+except KeyError:
+    prefs["font_size"] = 16
+open("conf.json", "w+").write(json.dumps(prefs, indent = 4))
 term = pygame.display.set_mode(prefs["size"], pygame.RESIZABLE)
 pygame.display.update()
-pygame.init()
+pygame.font.init()
 
 if compositor == "org.kde.KWin":
     print(compositor)
@@ -48,17 +68,45 @@ bg_color = 0x112222
 hold_display = False
 
 class Font():
-    def __init__(self):
-        self.size = 16
+    def change_size(self, size):
+        self.size = min(max(8, size), 24)
+        prefs = json.loads(open("conf.json").read())
+        prefs["font_size"] = self.size
+        open("conf.json", "w+").write(json.dumps(prefs, indent = 4))
         self.b = pygame.font.Font(s('./assets/font/UbuntuMono-B.ttf'), self.size)
         self.bi = pygame.font.Font(s('./assets/font/UbuntuMono-BI.ttf'), self.size)
         self.r = pygame.font.Font(s('./assets/font/UbuntuMono-R.ttf'), self.size)
         self.ri = pygame.font.Font(s('./assets/font/UbuntuMono-RI.ttf'), self.size)
+
+    def __init__(self, size = 16):
+        self.change_size(size)
+
     @property
     def i(self):
         return self.ri
 
-FONT = Font()
+    @property
+    def width(self):
+        return int(self.size / 2)
+    @property
+    def idfk(self):
+        return int(self.size / 4 * 3)
+
+class Img():
+    def __init__(self):
+        pass
+    @property
+    def h(self):
+        return round(9.75 * FONT.size)
+    @property
+    def w(self):
+        return self.h
+    @property
+    def hw(self):
+        return (self.w, self.h)
+
+FONT = Font(prefs["font_size"])
+IMG = Img()
 
 cur_font = FONT.r
 cur_color = 0x112222
@@ -100,10 +148,10 @@ class Term():
 
         @property
         def x(self):
-            return int((self.up.px.w - 20) / 8)
+            return int((self.up.px.w - 20) / FONT.width)
         @property
         def y(self):
-            return int((self.up.px.h - 20) / 16)
+            return int((self.up.px.h - 20) / FONT.size)
 
 
     class Offset(Dump):
@@ -112,10 +160,10 @@ class Term():
 
         @property
         def x(self):
-            return (self.up.px.x - 20 - self.up.size.w * 8) / 2
+            return (self.up.px.x - 20 - self.up.size.w * FONT.width) / 2
         @property
         def y(self):
-            return (self.up.px.y - 20 - self.up.size.h * 16) / 2
+            return (self.up.px.y - 20 - self.up.size.h * FONT.size) / 2
 
     class Border(Dump):
         def __init__(self, up):
@@ -123,16 +171,27 @@ class Term():
 
         @property
         def x(self):
-            return (self.up.px.x - self.up.size.w * 8) / 2
+            return (self.up.px.x - self.up.size.w * FONT.width) / 2
         @property
         def y(self):
-            return (self.up.px.y - self.up.size.h * 16) / 2
+            return (self.up.px.y - self.up.size.h * FONT.size) / 2
 
+    class Minimum(Dump):
+        def __init__(self, up):
+            self.up = up
+
+        @property
+        def x(self):
+            return 77 * FONT.width + 20
+        @property
+        def y(self):
+            return 28 * FONT.size + 20
 
     def __init__(self, width, height):
         self.off = self.Offset(self)
         self.size = self.Size(self)
         self.border = self.Border(self)
+        self.min = self.Minimum(self)
         self.px = self.Dump()
         self.px.x = width
         self.px.y = height
@@ -175,9 +234,9 @@ TERM = Term(*pygame.display.get_window_size())
 def handle_resize():
     global last_resize
     w, h = pygame.display.get_window_size()
-    if w < 640 or h < 480:
+    if w < TERM.min.w or h < TERM.min.h:
         print(w, h)
-        wh = (max(w, 640), max(h, 480))
+        wh = (max(w, TERM.min.w), max(h, TERM.min.h))
         flag = pygame.HWSURFACE | pygame.DOUBLEBUF
         pygame.display.set_mode(wh, flags = flag)
         pygame.display.set_mode(wh, flags = flag | pygame.RESIZABLE)
@@ -198,7 +257,7 @@ def redraw():
 def put(txt, x, y, color = None, font = None, cls = True, y_offset = 0, x_offset = 0, center = 0, right = 0, left = 0, char = " "):
     global cur_font, cur_color, bg_color, TERM
     x += TERM.border.x + x_offset
-    y += TERM.border.y + y_offset
+    y += TERM.border.y# + y_offset
     font = font or cur_font
     color = color or cur_color
     cur_font = font
@@ -232,18 +291,18 @@ def put(txt, x, y, color = None, font = None, cls = True, y_offset = 0, x_offset
     return txt
 
 
-def echo(txt = " ", **kw):
+def echo(txt = " ", cls = False, **kw):
     global TERM
     global cur_font, cur_color
-    put(txt, TERM.x * 8, TERM.y * 16, cls = False, **kw)
+    put(txt, TERM.x * FONT.width, TERM.y * FONT.size, cls = cls, **kw)
     TERM.x = 0
     TERM.y += 1
 
 
-def echo_n(txt = " ", **kw):
+def echo_n(txt = " ", cls = False, **kw):
     global TERM
     global cur_font, cur_color
-    txt = put(txt, TERM.x * 8, TERM.y * 16, cls = False, **kw)
+    txt = put(txt, TERM.x * FONT.width, TERM.y * FONT.size, cls = cls, **kw)
     TERM.x += len(txt)
     if txt == " ":
         TERM.x -= 1
@@ -266,3 +325,11 @@ def echo_s(txt, off_width = 0, indent = 0, **kw):
             TERM.x = indent
         echo_n(word + " ", **kw)
     echo()
+
+
+
+def mouse_cursor(event, top_offset, low_offset, ls):
+    return min(max(int((event.pos[1] - FONT.size * top_offset + TERM.border.y) / FONT.size), 0), min(TERM.h - low_offset, len(ls) - 1))
+
+def cursor_highlight(position):
+    return (0, position * FONT.size + TERM.border.y, TERM.px.w, FONT.size + 2)
