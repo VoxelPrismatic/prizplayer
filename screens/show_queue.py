@@ -99,7 +99,7 @@ def show_queue():
             echo(f"[{cursor + 1}/{len(added)}]", right = TERM.w, char = "-", font = FONT.b, color = 0x008800)
             if ctrl:
                 echo_n("CTRL // l - Load queue  /  s - Save queue  /  F1 - Help")
-            if alt:
+            elif alt:
                 echo_n("ALT // f - Toggle search")
             else:
                 echo_n("CTRL/ALT - Shortcut / DEL - Remove / ,/. - Up/down / ENTER - Play now")

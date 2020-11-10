@@ -66,10 +66,12 @@ def file_chooser():
                 offset = 0
             TERM.foot()
             echo(f"[{cursor + 1}/{len(added)}]", right = TERM.w, char = "-", color = 0x880044, font = FONT.b)
+            if ctrl:
+                echo_n("CTRL // q - Show queue  /  p - Show player  /  F1 - Help")
             if alt:
-                echo_n("a - Toggle all  /  f - Toggle search  /  F1 - Help")
+                echo_n("ALT // a - Toggle all  /  f - Toggle search")
             else:
-                echo_n("ALT - Use shortcut  /  ENTER - ")
+                echo_n("CTRL/ALT - Shortcut  /  ENTER - ")
                 if os.path.isdir(directory + ls[cursor]):
                     echo_n("Open folder  /  F2 - ")
                     if ls[cursor] == ".." and directory in prefs["search_dirs"]:
